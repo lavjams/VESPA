@@ -60,9 +60,10 @@ MEARTH = const.M_earth.cgs.value
 class EclipsePopulation(StarPopulation):
     def __init__(self, stars=None, period=None, model='',
                  priorfactors=None, lhoodcachefile=None,
-                 orbpop=None, prob=None,
+                 orbpop=None, prob=None, powerlawpower=None,
                  cadence=0.020434028, #Kepler observing cadence, in days
-                 **kwargs):
+                 **kwargs): #JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
+#JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
         """Base class for populations of eclipsing things.
 
         stars DataFrame must have the following columns:
@@ -77,8 +78,33 @@ class EclipsePopulation(StarPopulation):
         if prob is not passed; should be able to calculated from given
         star/orbit properties.
         """
-        
-        self.period = period
+
+        ###JChange Block: Start! 2-26-15
+        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+        def powerlawperiod(n, p):
+            #Below imports basic packages
+            import numpy as np
+            import random as rand
+	
+            #Below samples random numbers between 0 and endrange
+            endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+            randnum = np.zeros(n) #To hold random numbers
+            for a in range(0, n):
+		randnum[a] = rand.random() * endrange
+	
+            #Below generates the power law results
+            perdone = (randnum**p)
+            return perdone
+	
+        #Below generates a power law period distribution if specified for period distribution
+        if period == 'powerlaw':
+            if stars is not None:
+                self.period = powerlawperiod(len(stars), powerlawpower)
+        else:
+            self.period = period
+        ###JChange Block: End!
+
+        #self.period = period #JChange: Commented out! 2-26-15
         self.model = model
         if priorfactors is None:
             priorfactors = {}
