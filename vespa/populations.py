@@ -109,6 +109,13 @@ class EclipsePopulation(StarPopulation):
             self.period = period
         ###JChange Block: End!
 
+        ###JChange Testing! Start 2-27-15
+        printperiods = open('printperiods.txt', 'w')
+        printperiods.write(str(period))
+        printperiods.flush()
+        printperiods.close()
+        ###JChange Testing! End
+
         #self.period = period #JChange: Commented out! 2-26-15
         self.model = model
         if priorfactors is None:
