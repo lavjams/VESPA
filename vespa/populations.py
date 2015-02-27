@@ -79,6 +79,11 @@ class EclipsePopulation(StarPopulation):
         star/orbit properties.
         """
 
+        ###JChange Test: Start! 2-27-15
+        period = 'powerlaw'
+        ###JChange Test: End!
+
+
         ###JChange Block: Start! 2-26-15
         #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
         def powerlawperiod(n, p):
