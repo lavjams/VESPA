@@ -94,9 +94,9 @@ class EclipsePopulation(StarPopulation):
                  priorfactors=None, lhoodcachefile=None,
                  orbpop=None, prob=None, numperiod=None, powerlawpower=None,
                  cadence=0.020434028, #Kepler observing cadence, in days
-                 **kwargs): #JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
+                 **kwargs): #####JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
 #JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
-#Another JChange; also added in the 'powerlawperiod' parameter to hold changes
+#####Another JChange; also added in the parameter 'numperiod' to specify the number of periods to generate, just for now.
         """Base class for populations of eclipsing things.
 
         stars DataFrame must have the following columns:
@@ -120,12 +120,22 @@ class EclipsePopulation(StarPopulation):
                 raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
             global numperiod0
             numperiod0 = numperiod
+            numperiod
+            numperiod0
             global powerlawpower0
             powerlawpower0 = powerlawpower
         #####JChange End: 3-4-15    
+
+        #####JChange Start: 3-4-15
+        if period == 'powerlaw':
+            self.period = powerlawperiod(numperiod0, powerlawpower0)
+        else:
+            self.period = period
+        #####JChange End:
+
       
         
-        self. period = period
+  #      self. period = period #####JChange: Commented this out 3-5-15
         self.model = model
         if priorfactors is None:
             priorfactors = {}
@@ -1012,14 +1022,11 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         isochrone is Dartmouth, by default (in starutils)
         """
 
-        #####JChange Start: 3-4-15
-        if period == 'powerlaw':
-            self.period = powerlawperiod(numperiod0, powerlawpower0)
-        else:
+
+        #####JChange Start: 3-5-15
+        if period != 'powerlaw':
             self.period = period
         #####JChange End:
-
-
 #        self.period = period  #####JChange: Commented this out 3-4-15
         self.model = model
         self.band = band
