@@ -57,13 +57,46 @@ REARTH = const.R_earth.cgs.value
 MEARTH = const.M_earth.cgs.value
 
 
+
+
+
+
+###
+        ###JChange Block: Start! 2-26-15
+        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+def powerlawperiod(n, p):
+    #Below imports basic packages
+    import numpy as np
+    import random as rand
+    
+    #Below samples random numbers between 0 and endrange
+    endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+    randnum = np.zeros(n) #To hold random numbers
+    for a in range(0, n):
+        randnum[a] = rand.random() * endrange
+	
+    #Below generates the power law results
+    perdone = (randnum**p)
+    return perdone
+    ###JChange Block: End!
+###
+
+#####JChange Start: 3-4-15
+numperiod0 = 0
+powerlawpower0 = 0
+#####JChange End:
+
+
+
+
 class EclipsePopulation(StarPopulation):
     def __init__(self, stars=None, period=None, model='',
                  priorfactors=None, lhoodcachefile=None,
-                 orbpop=None, prob=None, powerlawpower=None,
+                 orbpop=None, prob=None, numperiod=None, powerlawpower=None,
                  cadence=0.020434028, #Kepler observing cadence, in days
                  **kwargs): #JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
 #JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
+#Another JChange; also added in the 'powerlawperiod' parameter to hold changes
         """Base class for populations of eclipsing things.
 
         stars DataFrame must have the following columns:
@@ -79,44 +112,20 @@ class EclipsePopulation(StarPopulation):
         star/orbit properties.
         """
 
-        ###JChange Test: Start! 2-27-15
-        period = 'powerlaw'
-        ###JChange Test: End!
 
-
-        ###JChange Block: Start! 2-26-15
-        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-        def powerlawperiod(n, p):
-            #Below imports basic packages
-            import numpy as np
-            import random as rand
-	
-            #Below samples random numbers between 0 and endrange
-            endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
-            randnum = np.zeros(n) #To hold random numbers
-            for a in range(0, n):
-		randnum[a] = rand.random() * endrange
-	
-            #Below generates the power law results
-            perdone = (randnum**p)
-            return perdone
-	
-        #Below generates a power law period distribution if specified for period distribution
+        #####JChange Start: 3-4-15
+        #Below gives period distribution if specified in passed in parameters
         if period == 'powerlaw':
-            if stars is not None:
-                self.period = powerlawperiod(len(stars), powerlawpower)
-        else:
-            self.period = period
-        ###JChange Block: End!
-
-        ###JChange Testing! Start 2-27-15
-        printperiods = open('printperiods.txt', 'w')
-        printperiods.write(str(period))
-        printperiods.flush()
-        printperiods.close()
-        ###JChange Testing! End
-
-        #self.period = period #JChange: Commented out! 2-26-15
+            if numperiod is None or powerlawpower is None:
+                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
+            global numperiod0
+            numperiod0 = numperiod
+            global powerlawpower0
+            powerlawpower0 = powerlawpower
+        #####JChange End: 3-4-15    
+      
+        
+        self. period = period
         self.model = model
         if priorfactors is None:
             priorfactors = {}
@@ -128,13 +137,18 @@ class EclipsePopulation(StarPopulation):
 
         StarPopulation.__init__(self, stars=stars, orbpop=orbpop, 
                                 name=model, **kwargs)
-        
+
+###
         if stars is not None:
             if len(self.stars)==0:
                 raise EmptyPopulationError('Zero elements in {} population'.format(model))
 
         if 'slope' in self.stars:
             self._make_kde()
+
+
+
+
 
     def fit_trapezoids(self, MAfn=None, msg=None, **kwargs):
         logging.info('Fitting trapezoid models for {}...'.format(self.model))
@@ -998,7 +1012,15 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         isochrone is Dartmouth, by default (in starutils)
         """
 
-        self.period = period
+        #####JChange Start: 3-4-15
+        if period == 'powerlaw':
+            self.period = powerlawperiod(numperiod0, powerlawpower0)
+        else:
+            self.period = period
+        #####JChange End:
+
+
+#        self.period = period  #####JChange: Commented this out 3-4-15
         self.model = model
         self.band = band
         self.lhoodcachefile = lhoodcachefile
