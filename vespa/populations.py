@@ -111,31 +111,36 @@ class EclipsePopulation(StarPopulation):
         if prob is not passed; should be able to calculated from given
         star/orbit properties.
         """
-
+        'woo'
+    def testfunc(self):
 
         #####JChange Start: 3-4-15
         #Below gives period distribution if specified in passed in parameters
-        if period == 'powerlaw':
-            if numperiod is None or powerlawpower is None:
-                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
-            global numperiod0
-            numperiod0 = numperiod
-            numperiod
-            numperiod0
-            global powerlawpower0
-            powerlawpower0 = powerlawpower
+#        if period == 'powerlaw':
+ #           if numperiod is None or powerlawpower is None:
+  #              raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
+#            global numperiod0
+ #           numperiod0 = numperiod
+  #          numperiod
+   #         numperiod0
+    #        global powerlawpower0
+     #       powerlawpower0 = powerlawpower
         #####JChange End: 3-4-15    
 
-        #####JChange Start: 3-4-15
-        if period == 'powerlaw':
-            self.period = powerlawperiod(numperiod0, powerlawpower0)
-        else:
-            self.period = period
+        #####JChange Start: 3-5-15
+#        if period == 'powerlaw':
+#            if numperiod is None or powerlawpower is None:
+ #               raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
+  #          self.numperiod = numperiod
+   #         self.powerlawpower = powerlawpower
         #####JChange End:
 
+        #####JChange Start: 3-5-15
+        if period == 'powerlaw':
+            
       
         
-  #      self. period = period #####JChange: Commented this out 3-5-15
+        self. period = period
         self.model = model
         if priorfactors is None:
             priorfactors = {}
@@ -1021,12 +1026,16 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
 
         isochrone is Dartmouth, by default (in starutils)
         """
-
-
-        #####JChange Start: 3-5-15
-        if period != 'powerlaw':
+        
+        #####JChange Start: 3-4-15
+        if period == 'powerlaw':
+   #         self.period = powerlawperiod(numperiod0, powerlawpower0)
+            self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
+        else:
             self.period = period
         #####JChange End:
+
+
 #        self.period = period  #####JChange: Commented this out 3-4-15
         self.model = model
         self.band = band
