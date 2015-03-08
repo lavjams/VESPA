@@ -995,7 +995,11 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                  ra=None, dec=None, trilegal_filename=None,
                  n=2e4, ichrone=DARTMOUTH, band='Kepler',
                  MAfn=None, lhoodcachefile=None,
-                 maxrad=10, f_binary=0.4, model='BEBs', **kwargs):
+                 maxrad=10, f_binary=0.4, model='BEBs', 
+                 numperiod=None, powerlawpower=None, #####JChange, 3-8-15; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
+#JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
+#####Another JChange; also added in the parameter 'numperiod' to specify the number of periods to generate, just for now.
+                 **kwargs):
         """
 
         Filename is for loading population from HDF
@@ -1009,8 +1013,11 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
 
 
         #####JChange Start: 3-8-15
+        #Below generates a power law period distribution if period is set to 'powerlaw', using the passed in parameters of numperiod and powerlawpower
         if period == 'powerlaw':
-            self.period = EclipsePopulation().powerlawperiod()
+            if numperiod is None or powerlawpower is None:
+                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
+            self.period = EclipsePopulation(numperiod=numperiod, powerlawpower=powerlawpower).powerlawperiod() #Calls EclipsePopulation method to generate power law period distribution
         else:
             self.period = period
         #####JChange End:
