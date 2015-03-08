@@ -59,18 +59,6 @@ MEARTH = const.M_earth.cgs.value
 
 
 
-
-
-
-#####JChange Start: 3-8-15
-numperiod0 = 0
-powerlawpower0 = 0
-powerlawperiod = None
-#####JChange End:
-
-
-
-
 class EclipsePopulation(StarPopulation):
     def __init__(self, stars=None, period=None, model='',
                  priorfactors=None, lhoodcachefile=None,
@@ -95,57 +83,19 @@ class EclipsePopulation(StarPopulation):
         """
         
         #####JChange Start: 3-8-15
+        #Below generates a power law period distribution, if period set to 'powerlaw'
         self.n = numperiod
         self.p = powerlawpower
         if period == 'powerlaw':
             if numperiod is None or powerlawpower is None:
                 raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
 
-
+        #Otherwise, sets period to be just period, as originally set
         if period != 'powerlaw':
             self.period = period
-    
         #####JChange End:
-        
-
-        #####JChange Start: 3-5-15
-        #Below gives period distribution if specified in passed in parameters
-  #      if period == 'powerlaw':
-  #          if numperiod is None or powerlawpower is None:
-  #              raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
-##            global numperiod0
- #           numperiod0 = numperiod
-  #          numperiod
-   #         numperiod0
-    #        global powerlawpower0
-     #       powerlawpower0 = powerlawpower
-
-   #     self.period = powerlawperiod(numperiod, powerlawpower)
-        #####JChange End: 3-5-15    
-
-        #####JChange Start: 3-5-15
-#        if period == 'powerlaw':
-#            if numperiod is None or powerlawpower is None:
- #               raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
-  #          self.numperiod = numperiod
-   #         self.powerlawpower = powerlawpower
-        #####JChange End:
-
-
-        #####JChange Start: 3-8-15
-#        if period == 'powerlaw':
-#            EclipsePopulation.powerlawperiodE = powerlawperiod(numperiod, powerlawpower)
-#        else:
- #           self.period = period
-        #####JChange End:
-        
         
       
-
-
-
-
-        
       #  self. period = period  #####JChange: Commented out 3-8-15
         self.model = model
         if priorfactors is None:
@@ -172,18 +122,8 @@ class EclipsePopulation(StarPopulation):
         #####JChange End:
 
 
-    #####JChange Start: 3-8-15
-    ###Generating periods as a function in EclipsePopulations; work in progress
-#    def powerlawperiodE():
-#        return powerlawperiod(numperiod0, powerlawperiod0)
-    #####JChange End:
-
-
-
-
-        ###
-        ###JChange Block: Start! 2-26-15
-        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+    #####JChange Block: Start! 3-8-15
+    #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
     def powerlawperiod(self):
     #Below imports basic packages
         import numpy as np
@@ -198,9 +138,8 @@ class EclipsePopulation(StarPopulation):
     #Below generates the power law results
         perdone = (randnum**self.p)
         return perdone
-   #     EclipsePopulation.powerlawperiodE = perdone
-    ###JChange Block: End!
-###
+    #####JChange Block: End!
+
 
 
 
@@ -1067,26 +1006,10 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
 
         isochrone is Dartmouth, by default (in starutils)
         """
-        
-        #####JChange Start: 3-4-15
-#        if period == 'powerlaw':
-   #         self.period = powerlawperiod(numperiod0, powerlawpower0)
- #           self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
-  #      else:
-   #         self.period = period
-        #####JChange End:
 
 
         #####JChange Start: 3-8-15
         if period == 'powerlaw':
- #           self.period = powerlawperiod(
- #       else:
- #           self.period = period
-  #          self.period = period
-  #      else:
- #           self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
-     #       EclipsePopulation.powerlawperiod
-     #       self.period = EclipsePopulation.powerlawperiodE
             self.period = EclipsePopulation().powerlawperiod()
         else:
             self.period = period
