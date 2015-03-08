@@ -61,29 +61,11 @@ MEARTH = const.M_earth.cgs.value
 
 
 
-###
-        ###JChange Block: Start! 2-26-15
-        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-def powerlawperiod(n, p):
-    #Below imports basic packages
-    import numpy as np
-    import random as rand
-    
-    #Below samples random numbers between 0 and endrange
-    endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
-    randnum = np.zeros(n) #To hold random numbers
-    for a in range(0, n):
-        randnum[a] = rand.random() * endrange
-	
-    #Below generates the power law results
-    perdone = (randnum**p)
-    return perdone
-    ###JChange Block: End!
-###
 
-#####JChange Start: 3-4-15
+#####JChange Start: 3-8-15
 numperiod0 = 0
 powerlawpower0 = 0
+powerlawperiod = None
 #####JChange End:
 
 
@@ -111,21 +93,35 @@ class EclipsePopulation(StarPopulation):
         if prob is not passed; should be able to calculated from given
         star/orbit properties.
         """
-        'woo'
-    def testfunc(self):
+        
+        #####JChange Start: 3-8-15
+        self.n = numperiod
+        self.p = powerlawpower
+        if period == 'powerlaw':
+            if numperiod is None or powerlawpower is None:
+                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
 
-        #####JChange Start: 3-4-15
+
+        if period != 'powerlaw':
+            self.period = period
+    
+        #####JChange End:
+        
+
+        #####JChange Start: 3-5-15
         #Below gives period distribution if specified in passed in parameters
-#        if period == 'powerlaw':
- #           if numperiod is None or powerlawpower is None:
+  #      if period == 'powerlaw':
+  #          if numperiod is None or powerlawpower is None:
   #              raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower,' with valid values.")
-#            global numperiod0
+##            global numperiod0
  #           numperiod0 = numperiod
   #          numperiod
    #         numperiod0
     #        global powerlawpower0
      #       powerlawpower0 = powerlawpower
-        #####JChange End: 3-4-15    
+
+   #     self.period = powerlawperiod(numperiod, powerlawpower)
+        #####JChange End: 3-5-15    
 
         #####JChange Start: 3-5-15
 #        if period == 'powerlaw':
@@ -135,12 +131,22 @@ class EclipsePopulation(StarPopulation):
    #         self.powerlawpower = powerlawpower
         #####JChange End:
 
-        #####JChange Start: 3-5-15
-        if period == 'powerlaw':
-            
-      
+
+        #####JChange Start: 3-8-15
+#        if period == 'powerlaw':
+#            EclipsePopulation.powerlawperiodE = powerlawperiod(numperiod, powerlawpower)
+#        else:
+ #           self.period = period
+        #####JChange End:
         
-        self. period = period
+        
+      
+
+
+
+
+        
+      #  self. period = period  #####JChange: Commented out 3-8-15
         self.model = model
         if priorfactors is None:
             priorfactors = {}
@@ -158,8 +164,43 @@ class EclipsePopulation(StarPopulation):
             if len(self.stars)==0:
                 raise EmptyPopulationError('Zero elements in {} population'.format(model))
 
-        if 'slope' in self.stars:
-            self._make_kde()
+
+        #####JChange Start: 3-5-15
+            ###I indented the following two lines, to be under the 'if stars is not None' heading
+            if 'slope' in self.stars:
+                self._make_kde()
+        #####JChange End:
+
+
+    #####JChange Start: 3-8-15
+    ###Generating periods as a function in EclipsePopulations; work in progress
+#    def powerlawperiodE():
+#        return powerlawperiod(numperiod0, powerlawperiod0)
+    #####JChange End:
+
+
+
+
+        ###
+        ###JChange Block: Start! 2-26-15
+        #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+    def powerlawperiod(self):
+    #Below imports basic packages
+        import numpy as np
+        import random as rand
+        
+    #Below samples random numbers between 0 and endrange
+        endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+        randnum = np.zeros(self.n) #To hold random numbers
+        for a in range(0, self.n):
+            randnum[a] = rand.random() * endrange
+	
+    #Below generates the power law results
+        perdone = (randnum**self.p)
+        return perdone
+   #     EclipsePopulation.powerlawperiodE = perdone
+    ###JChange Block: End!
+###
 
 
 
@@ -1028,9 +1069,25 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         """
         
         #####JChange Start: 3-4-15
-        if period == 'powerlaw':
+#        if period == 'powerlaw':
    #         self.period = powerlawperiod(numperiod0, powerlawpower0)
-            self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
+ #           self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
+  #      else:
+   #         self.period = period
+        #####JChange End:
+
+
+        #####JChange Start: 3-8-15
+        if period == 'powerlaw':
+ #           self.period = powerlawperiod(
+ #       else:
+ #           self.period = period
+  #          self.period = period
+  #      else:
+ #           self.period = powerlawperiod(EclipsePopulation.numperiod, EclipsePopulation.powerlawpower)
+     #       EclipsePopulation.powerlawperiod
+     #       self.period = EclipsePopulation.powerlawperiodE
+            self.period = EclipsePopulation().powerlawperiod()
         else:
             self.period = period
         #####JChange End:
