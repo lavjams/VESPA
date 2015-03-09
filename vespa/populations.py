@@ -1038,6 +1038,9 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                           ra=ra, dec=dec, mags=mags,
                           n=n, ichrone=ichrone, MAfn=MAfn,
                           maxrad=maxrad, f_binary=f_binary, **kwargs)
+        else:
+            raise ValueError('Must pass either filename or information for'+\
+                                 'TRILEGAL population.')
 
     @property
     def prior(self):
