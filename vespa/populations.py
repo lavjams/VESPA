@@ -58,15 +58,35 @@ MEARTH = const.M_earth.cgs.value
 
 
 
+#####JChange Block: Start! 3-9-15
+#Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+def powerlawperiod(n, p):
+#Below imports basic packages
+    import numpy as np
+    import random as rand
+    
+#Below samples random numbers between 0 and endrange
+    endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+    randnum = np.zeros(n) #To hold random numbers
+    for a in range(0, n):
+        randnum[a] = rand.random() * endrange
+	
+    #Below generates the power law results
+    perdone = (randnum**p)
+    return perdone
+#####JChange Block: End!
+
 
 class EclipsePopulation(StarPopulation):
     def __init__(self, stars=None, period=None, model='',
                  priorfactors=None, lhoodcachefile=None,
-                 orbpop=None, prob=None, numperiod=None, powerlawpower=None,
+                 orbpop=None, prob=None,
+                 makeperiod=None, powerlawpower=None, #JChange, talked of below
                  cadence=0.020434028, #Kepler observing cadence, in days
                  **kwargs): #####JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
 #JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
-#####Another JChange; also added in the parameter 'numperiod' to specify the number of periods to generate, just for now.
+#####Another JChange, from 8-10-15; added in the parameter 'makeperiod', which, if set to 'powerlaw', will run the power law distribution generator of periods
+
         """Base class for populations of eclipsing things.
 
         stars DataFrame must have the following columns:
@@ -82,16 +102,32 @@ class EclipsePopulation(StarPopulation):
         star/orbit properties.
         """
         
-        #####JChange Start: 3-8-15
+        #####JChange Start: 3-10-15
         #Below generates a power law period distribution, if period set to 'powerlaw'
-        self.n = numperiod
-        self.p = powerlawpower
-        if period == 'powerlaw':
-            if numperiod is None or powerlawpower is None:
+        if makeperiod == 'powerlaw':
+            if powerlawpower is None:
                 raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
 
+            self.period = powerlawperiod(len(stars), powerlawpower)
+            self.stars.P = self.period
+             
+            ###JTest START
+            testfile = open('testfile.txt', 'w')
+            for a in range(0, len(self.period)):
+                testfile.write(str(self.period[a]) + '\n')
+            testfile.write('\n\n\n')
+            for b in range(0, len(self.stars.P)):
+                testfile.write(str(self.stars.P[b]) + '\n')
+            testfile.flush()
+            testfile.close()
+            
+            import matplotlib.pyplot as graph
+            graph.hist(self.period)
+            graph.show()
+            ###JTest END
+ 
         #Otherwise, sets period to be just period, as originally set
-        if period != 'powerlaw':
+        elif makeperiod != 'powerlaw':
             self.period = period
         #####JChange End:
         
@@ -115,30 +151,9 @@ class EclipsePopulation(StarPopulation):
                 raise EmptyPopulationError('Zero elements in {} population'.format(model))
 
 
-        #####JChange Start: 3-5-15
-            ###I indented the following two lines, to be under the 'if stars is not None' heading
-            if 'slope' in self.stars:
-                self._make_kde()
-        #####JChange End:
+        if 'slope' in self.stars:
+            self._make_kde()
 
-
-    #####JChange Block: Start! 3-8-15
-    #Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-    def powerlawperiod(self):
-    #Below imports basic packages
-        import numpy as np
-        import random as rand
-        
-    #Below samples random numbers between 0 and endrange
-        endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
-        randnum = np.zeros(self.n) #To hold random numbers
-        for a in range(0, self.n):
-            randnum[a] = rand.random() * endrange
-	
-    #Below generates the power law results
-        perdone = (randnum**self.p)
-        return perdone
-    #####JChange Block: End!
 
 
 
@@ -996,9 +1011,6 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                  n=2e4, ichrone=DARTMOUTH, band='Kepler',
                  MAfn=None, lhoodcachefile=None,
                  maxrad=10, f_binary=0.4, model='BEBs', 
-                 numperiod=None, powerlawpower=None, #####JChange, 3-8-15; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
-#JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
-#####Another JChange; also added in the parameter 'numperiod' to specify the number of periods to generate, just for now.
                  **kwargs):
         """
 
@@ -1011,19 +1023,7 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         isochrone is Dartmouth, by default (in starutils)
         """
 
-
-        #####JChange Start: 3-8-15
-        #Below generates a power law period distribution if period is set to 'powerlaw', using the passed in parameters of numperiod and powerlawpower
-        if period == 'powerlaw':
-            if numperiod is None or powerlawpower is None:
-                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
-            self.period = EclipsePopulation(numperiod=numperiod, powerlawpower=powerlawpower).powerlawperiod() #Calls EclipsePopulation method to generate power law period distribution
-        else:
-            self.period = period
-        #####JChange End:
-
-
-#        self.period = period  #####JChange: Commented this out 3-4-15
+        self.period = period
         self.model = model
         self.band = band
         self.lhoodcachefile = lhoodcachefile
@@ -1181,7 +1181,8 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         EclipsePopulation.__init__(self, stars=stars, #orbpop=orbpop,
                                    period=self.period, model=self.model,
                                    lhoodcachefile=self.lhoodcachefile,
-                                   priorfactors=priorfactors, prob=tot_prob)
+                                   priorfactors=priorfactors, prob=tot_prob,
+                                   **kwargs) #####JChange, 3-10-15; added in the '**kwargs' argument
 
         #add Rsky property
         self.stars['Rsky'] = randpos_in_circle(len(self.stars), 
