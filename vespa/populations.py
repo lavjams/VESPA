@@ -74,6 +74,8 @@ def powerlawperiod(n, p):
     #Below generates the power law results
     perdone = (randnum**p)
     return perdone
+
+ispowerlawperiod = False #Variable that will be set to true if power law period distribution generated
 #####JChange Block: End!
 
 
@@ -81,11 +83,11 @@ class EclipsePopulation(StarPopulation):
     def __init__(self, stars=None, period=None, model='',
                  priorfactors=None, lhoodcachefile=None,
                  orbpop=None, prob=None,
-                 makeperiod=None, powerlawpower=None, #JChange, talked of below
+                 powerlawpower=None, #JChange, talked of below
                  cadence=0.020434028, #Kepler observing cadence, in days
                  **kwargs): #####JChange; added the 'powerlawpower' parameter, which can take in a power for generating a power law distribution for the periods
 #JChange; if period = 'powerlaw', will generate a power law distribution of periods, to the power given by the parameter 'powerlawpower'
-#####Another JChange, from 8-10-15; added in the parameter 'makeperiod', which, if set to 'powerlaw', will run the power law distribution generator of periods
+#####Change to the above JChange, from 8-11-15; I removed the parameter 'makeperiod,' so that the parameter 'period' would carry out the function instead
 
         """Base class for populations of eclipsing things.
 
@@ -101,36 +103,68 @@ class EclipsePopulation(StarPopulation):
         if prob is not passed; should be able to calculated from given
         star/orbit properties.
         """
+
+
+
+        #####JTest START
+        testfile = open('testfile.txt', 'w')
+        global ispowerlawperiod
+        testfile.write('The variable ispowerlawperiod is currently set to: ' + ispowerlawperiod)
+        testfile.write("These are period values before calling the EclipsePopulation power law period generator.")
+        testfile.write("Periods recorded under 'period':")
+        for a in range(0, len(self.period)):
+            testfile.write(str(self.period[a]) + '\n')
+        testfile.write('\n\n\n')
+        testfile.write("Periods recorded under 'stars.P':")
+        for b in range(0, len(self.stars.P)):
+            testfile.write(str(self.stars.P[b]) + '\n')
         
-        #####JChange Start: 3-10-15
+        import matplotlib.pyplot as graph
+        graph.hist(self.period)
+        graph.show()
+        ###Test END
+
+        
+        #####JChange Start: 3-11-15
         #Below generates a power law period distribution, if period set to 'powerlaw'
-        if makeperiod == 'powerlaw':
+        if period == 'powerlaw' and not ispowerlawperiod:
+            ispowerlawperiod = True
             if powerlawpower is None:
-                raise ValueError("Please pass in both parameters 'numperiod' and 'powerlawpower' set to valid numerical values.")
+                raise ValueError("Please pass in parameter 'powerlawpower' set to a valid numerical value.")
 
             self.period = powerlawperiod(len(stars), powerlawpower)
-            self.stars.P = self.period
-             
-            ###JTest START
-            testfile = open('testfile.txt', 'w')
-            for a in range(0, len(self.period)):
-                testfile.write(str(self.period[a]) + '\n')
-            testfile.write('\n\n\n')
-            for b in range(0, len(self.stars.P)):
-                testfile.write(str(self.stars.P[b]) + '\n')
-            testfile.flush()
-            testfile.close()
-            
-            import matplotlib.pyplot as graph
-            graph.hist(self.period)
-            graph.show()
-            ###JTest END
+               
+
+ 
  
         #Otherwise, sets period to be just period, as originally set
-        elif makeperiod != 'powerlaw':
+        elif period != 'powerlaw' and not ispowerlawperiod:
             self.period = period
         #####JChange End:
         
+
+        ###JTest START
+        testfile.write('\n\n\n')
+        testfile.write('The variable ispowerlawperiod is currently set to: ' + ispowerlawperiod)
+        testfile.write("These are period values after calling the EclipsePopulation power law period generator.")
+        testfile.write("Periods recorded under 'period':")
+        for a in range(0, len(self.period)):
+            testfile.write(str(self.period[a]) + '\n')
+        testfile.write('\n\n\n')
+        testfile.write("Periods recorded under 'stars.P':")
+        for b in range(0, len(self.stars.P)):
+            testfile.write(str(self.stars.P[b]) + '\n')
+
+        graph.hist(self.period)
+        graph.show()
+        
+        testfile.flush()
+        testfile.close()
+        ###JTest END
+
+
+
+
       
       #  self. period = period  #####JChange: Commented out 3-8-15
         self.model = model
@@ -1120,7 +1154,8 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                                                         period=self.period, 
                                                         calc_mininc=True,
                                                         return_indices=True,
-                                                        MAfn=MAfn)
+                                                        MAfn=MAfn,
+                                                        **kwargs) ###JChange, 3-12-15; added in the keyword **kwargs
             s = s.iloc[inds].copy()
             s.reset_index(inplace=True)
             for col in df.columns:
@@ -1181,8 +1216,7 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
         EclipsePopulation.__init__(self, stars=stars, #orbpop=orbpop,
                                    period=self.period, model=self.model,
                                    lhoodcachefile=self.lhoodcachefile,
-                                   priorfactors=priorfactors, prob=tot_prob,
-                                   **kwargs) #####JChange, 3-10-15; added in the '**kwargs' argument
+                                   priorfactors=priorfactors, prob=tot_prob)
 
         #add Rsky property
         self.stars['Rsky'] = randpos_in_circle(len(self.stars), 
@@ -1535,13 +1569,18 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
                        incs=None, eccs=None, band='i',
                        mininc=None, maxecc=0.97, verbose=False,
                        return_probability_only=False, return_indices=False,
-                       calc_mininc=True, MAfn=None):
+                       calc_mininc=True, MAfn=None,
+                       powerlawpower=None, **kwargs): #####JChange, 3-12-15; added in the keywords 'powerlawpower', which is required to indicate the power for a power law period distribution.  Power law period distributions are generated when the keyword 'period' is set to 'powerlaw'.
+#####Another JChange, 3-12-15; added in the parameter **kwargs.
+
     """Returns random eclipse parameters for provided inputs
 
     If single period desired, pass 'period' keyword.
 
     M1s, M2s, R1s, R2s must be array_like
     """
+
+    
     if MAfn is None:
         logging.warning('MAInterpolationFunction not passed, so generating one...')
         MAfn = MAInterpolationFunction(nzs=200,nps=400,pmin=0.007,pmax=1/0.007)
@@ -1570,14 +1609,63 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
     #a bit clunky here, but works.
     simPs = False
     if period:
-        Ps = np.ones(n)*period
+
+    #####JChange Start: 3-12-15
+    #Below generates a power law period distribution, if period set to 'powerlaw'
+        global ispowerlawperiod #Global variable; will be 'True' if power law period distribution generated
+        perhere = np.zeros(n)
+        if period == 'powerlaw' and not ispowerlawperiod:
+            ispowerlawperiod = True
+            if powerlawpower is None:
+                raise ValueError("Please pass in parameter 'powerlawpower' set to a valid numerical value.")
+
+            #Below generates base power law period distribution
+            perhere = powerlawperiod(n, powerlawpower)
+
+            #Below fills in period array with above generated distribution
+            period = np.zeros(n)
+            for b in range(0, n):
+                period[b] = float(perhere[b])
+
+            ###JTest START
+            testing = open('testwoo.txt', 'w')
+            testing.write('M1s has size ' + str(np.size(M1s)) + '\n')
+            testing.write('n has size ' + str(n) + '\n')
+            testing.write('Period array has shape ' + str(period.shape) + '\n')
+            testing.write('Period array has size ' + str(np.size(period)) + '\n')
+            for a in range(0, n):
+                testing.write(str(period[a]) + '\n')
+            testing.flush()
+            testing.close()
+            ###JTest END
+ 
+    #####JChange End:
+
+    #####JChange Start: 3-12-15
+        #Below records the period values to Ps
+        if ispowerlawperiod:
+            Ps = np.zeros(n)
+            for a in range(0, n):
+                Ps[a] = perhere[a] * float(1)
+        else:
+            Ps = np.ones(n)*period
+    #####JChange End:
+
+        #Ps = np.ones(n)*period ###JChange, 3-12-15; commented this out
+
     else:
         if Ps is None:
             Ps = 10**(logperkde.rvs(n))
             simPs = True
     simeccs = False
     if eccs is None:
-        if not simPs and period is not None:
+        
+        #####JChange Start: 3-12-15; temporarily getting around the draw_eccs error about not being implemented for period type; requires further investigation
+        if ispowerlawperiod:
+            eccs = draw_eccs(n,perhere,maxecc=maxecc)
+        #####JChange End:
+
+        elif not simPs and period is not None: ###JChange, 3-12-15; temporarily changed from 'if' to 'elif'
             eccs = draw_eccs(n,period,maxecc=maxecc)
         else:
             eccs = draw_eccs(n,Ps,maxecc=maxecc)
