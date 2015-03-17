@@ -64,13 +64,11 @@ class EclipsePopulation(StarPopulation):
                  cadence=0.020434028, #Kepler observing cadence, in days
                  **kwargs):
         """Base class for populations of eclipsing things.
-
         stars DataFrame must have the following columns:
         'M_1', 'M_2', 'R_1', 'R_2', 'u1_1', 'u1_2', 'u2_1', 'u2_2', and 
         either the P keyword argument provided or a `period column, as 
         well as the eclipse parameters: 'inc', 'ecc', 'w', 'dpri', 
         'dsec', 'b_sec', 'b_pri', 'fluxfrac_1', 'fluxfrac_2'
-
         For some functionality, also needs to have trapezoid fit 
         parameters in DataFrame
         
@@ -193,9 +191,7 @@ class EclipsePopulation(StarPopulation):
     def _make_kde(self, use_sklearn=False, bandwidth=None, rtol=1e-6,
                   **kwargs):
         """Creates KDE objects for 3-d shape parameter distribution
-
         Uses scikit-learn KDE by default
-
         Keyword arguments passed to gaussian_kde
         """
 
@@ -445,16 +441,12 @@ class PlanetPopulation(EclipsePopulation):
                  rbin_width=0.3,
                  MAfn=None, lhoodcachefile=None, **kwargs):
         """Population of Transiting Planets
-
         Mostly a copy of EBPopulation, with small modifications.
-
         For simplicity, primary star has only a radius and mass;
         the real properties don't matter at all.
-
         
                 
         If file is passed, population is loaded from .h5 file.
-
         """
 
         self.period = period
@@ -599,22 +591,16 @@ class EBPopulation(EclipsePopulation, ColormatchMultipleStarPopulation):
                  MAfn=None, lhoodcachefile=None, starmodel=None,
                  **kwargs):
         """Population of EBs
-
         Mostly a copy of HEBPopulation, with small modifications.
-
         If file is passed, population is loaded from .h5 file.
-
         If file not passed, then a population will be generated.
         If mass, age, and feh are passed, then the primary of
         the population will be generated according to those distributions.
         If distributions are not passed, then populations will be generated
         according to provided starfield.
-
         mass is primary mass.  mass, age, and feh can be distributions
         (or tuples)
-
         kwargs passed to ``ColormatchMultipleStarPopulation`` 
-
         currently doesn't work if mags is None.
         """
 
@@ -639,7 +625,6 @@ class EBPopulation(EclipsePopulation, ColormatchMultipleStarPopulation):
                  MAfn=None, f_binary=0.4, starmodel=None,
                  **kwargs):
         """Generates stars and eclipses
-
         stars from ColormatchStellarPopulation; eclipses using calculate_eclipses
         """
         n = int(n)
@@ -764,20 +749,15 @@ class HEBPopulation(EclipsePopulation, ColormatchMultipleStarPopulation):
                  band='Kepler', model='HEBs', f_triple=0.12, n=2e4,
                  MAfn=None, lhoodcachefile=None, starmodel=None, **kwargs):
         """Population of HEBs
-
         If file is passed, population is loaded from .h5 file.
-
         If file not passed, then a population will be generated.
         If mass, age, and feh are passed, then the primary of
         the population will be generated according to those distributions.
         If distributions are not passed, then populations will be generated
         according to provided starfield.
-
         mass is primary mass.  mass, age, and feh can be distributions
         (or tuples)
-
         kwargs passed to ``ColormatchMultipleStarPopulation`` 
-
         currently doesn't work if mags is None.
         """
 
@@ -811,7 +791,6 @@ class HEBPopulation(EclipsePopulation, ColormatchMultipleStarPopulation):
                  MAfn=None, f_triple=0.12, starmodel=None,
                  **kwargs):
         """Generates stars and eclipses
-
         stars from ColormatchStellarPopulation; eclipses using calculate_eclipses
         """
         n = int(n)
@@ -950,13 +929,9 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                  MAfn=None, lhoodcachefile=None,
                  maxrad=10, f_binary=0.4, model='BEBs', **kwargs):
         """
-
         Filename is for loading population from HDF
-
         trilegal_filename holds BG star population
-
         maxrad in arcsec
-
         isochrone is Dartmouth, by default (in starutils)
         """
 
@@ -976,6 +951,7 @@ class BEBPopulation(EclipsePopulation, MultipleStarPopulation,
                           n=n, ichrone=ichrone, MAfn=MAfn,
                           maxrad=maxrad, f_binary=f_binary, **kwargs)
 
+					  
     @property
     def prior(self):
         return (super(BEBPopulation, self).prior * 
@@ -1140,14 +1116,10 @@ class PopulationSet(object):
                  beb_kws=None, pl_kws=None,
                  hide_exceptions=False):
         """
-
         Poplist can be a list of EclipsePopulations, a string (filename),
         or nothing, in which case the populations will be generated
-
         mass, radius, age, and feh can be two-element tuples or Distributions
-
         rprs, Teff, logg should be single values.
-
         """
 
         #if string is passed, load from file
@@ -1470,9 +1442,7 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
                        return_probability_only=False, return_indices=False,
                        calc_mininc=True, MAfn=None):
     """Returns random eclipse parameters for provided inputs
-
     If single period desired, pass 'period' keyword.
-
     M1s, M2s, R1s, R2s must be array_like
     """
     if MAfn is None:
@@ -1614,6 +1584,32 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
     u22 = u22s[i]
    
     
+	############################TEST
+    origstuff = open('origfile.txt', 'w')
+    origstuff.write('Statistics for calculating T14 and such within vespa.populations:\n')
+    origstuff.write('Periods as:\n')
+    origstuff.write(str(np.sort(np.array(P[0:100]))))
+    origstuff.write('\n\n')
+    origstuff.write('R1 as:\n')
+    origstuff.write(str(np.sort(np.array(R1[0:100]))))
+    origstuff.write('\n\n')
+    origstuff.write('R2 as:\n')
+    origstuff.write(str(np.sort(np.array(R2[0:100]))))
+    origstuff.write('\n\n')
+    origstuff.write('inc as:\n')
+    origstuff.write(str(np.sort(np.array(inc[0:100]))))
+    origstuff.write('\n\n')
+    origstuff.write('Ecc as:\n')
+    origstuff.write(str(np.sort(np.array(ecc[0:100]))))
+    origstuff.write('\n\n')
+    origstuff.write('Omega as:\n')
+    origstuff.write(str(np.sort(np.array(w[0:100]))))
+    origstuff.write('\n\n')
+	
+	
+	
+	
+	
     switched = (R2 > R1)
     R_large = switched*R2 + ~switched*R1
     R_small = switched*R1 + ~switched*R2
