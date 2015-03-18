@@ -1583,32 +1583,6 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
     u12 = u12s[i]
     u22 = u22s[i]
    
-    
-	############################TEST
-    origstuff = open('origfile.txt', 'w')
-    origstuff.write('Statistics for calculating T14 and such within vespa.populations:\n')
-    origstuff.write('Periods as:\n')
-    origstuff.write(str(np.sort(np.array(P[0:100]))))
-    origstuff.write('\n\n')
-    origstuff.write('R1 as:\n')
-    origstuff.write(str(np.sort(np.array(R1[0:100]))))
-    origstuff.write('\n\n')
-    origstuff.write('R2 as:\n')
-    origstuff.write(str(np.sort(np.array(R2[0:100]))))
-    origstuff.write('\n\n')
-    origstuff.write('inc as:\n')
-    origstuff.write(str(np.sort(np.array(inc[0:100]))))
-    origstuff.write('\n\n')
-    origstuff.write('Ecc as:\n')
-    origstuff.write(str(np.sort(np.array(ecc[0:100]))))
-    origstuff.write('\n\n')
-    origstuff.write('Omega as:\n')
-    origstuff.write(str(np.sort(np.array(w[0:100]))))
-    origstuff.write('\n\n')
-	
-	
-	
-	
 	
     switched = (R2 > R1)
     R_large = switched*R2 + ~switched*R1

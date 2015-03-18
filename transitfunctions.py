@@ -168,16 +168,14 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	#For T14:
 	sqrt14 = np.sqrt((1 + (rp/rs))**2.0 - imp**2.0)
 	const14 = np.arcsin((rs*rsun/semi)*(sqrt14/np.sin(angle*pi/180.0)))
-	T14 = (period/pi)*const14
+	approx14 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
+	T14 = (period/pi)*const14*approx14
 	
-	#For T140: This is the version used in T. Morton's code; not sure why yet...
-	T140 = (period/pi)*const14 *\
-		np.sqrt(1-ecc**2.0)/(1+ecc*np.sin(omega*pi/180.0))
-
 	#For T23:
 	sqrt23 = np.sqrt((1 - (rp/rs))**2.0 - imp**2.0)
 	const23 = np.arcsin((rs*rsun/semi)*(sqrt23/np.sin(angle*pi/180.0)))
-	T23 = (period/pi)*const23
+	approx23 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
+	T23 = (period/pi)*const23*approx23
 	
 	#Below calculates transit probability
 	prob = "You didn't specify omega.  Therefore the transit probability was not generated."
@@ -200,7 +198,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		depthexact = ((rp/rs)**2.0)*numeratorex/denominatorex
 	
 	#BELOW SECTION: Returns the calculated values
-	done = {'T14':T14, 'T23':T23, 'T140':T140, 'prob':prob, 'depthappr':depthappr, 'depthexact':depthexact}
+	done = {'T14':T14, 'T23':T23, 'prob':prob, 'depthappr':depthappr, 'depthexact':depthexact}
 
 	#Below returns generated values
 	return done
@@ -232,7 +230,6 @@ def testcalctransit(filename, numruns=1e3, **kwargs):
 	origT14 = np.array(origpop.stars.T14_pri)
 	origT23 = np.array(origpop.stars.T23_pri)
 	testT14 = testvals['T14']
-	testT140 = testvals['T140']
 	testT23 = testvals['T23']
 	
 	#Below tests the output
@@ -252,10 +249,6 @@ def testcalctransit(filename, numruns=1e3, **kwargs):
 	testfile.write('First Testing T14 Values as:\n')
 	for g in range(0, 100):
 		testfile.write(str(np.sort(testT14)[g]) + '\n')
-	testfile.write('\n\n')
-	testfile.write('First Testing T140 Values as:\n')
-	for g in range(0, 100):
-		testfile.write(str(np.sort(testT140)[g]) + '\n')
 	testfile.write('\n\n\n\n')
 	testfile.write('First Original T23 Values as:\n')
 	g = 0
