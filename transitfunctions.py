@@ -7,6 +7,7 @@
 
 #Below imports necessary packages
 import numpy as np
+import matplotlib.pyplot as graph
 import astropy.constants as const
 
 #Below imports necessary constants
@@ -67,25 +68,62 @@ def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=None, MAfn=None,
 #Purpose: This function is meant to run a star simulation to generate a population of stars and statistics, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
 #Numruns indicates the number of stars.
 #Dependencies:
-def runmodel(filename, periodp=2, ecca=0.5, eccb=0.5, numruns=1e3, **kwargs):
+def runmodel(filename='samplepop.h5', periodp=2, ecca=0.5, eccb=0.5, numruns=1e3, plot=False, **kwargs):
 	#Below calls an error if given file as nonexistent
 	import os.path
 	if os.path.isfile(filename) is False:
 		raise ValueError("Please pass in an existent file name.")
 	
-	#Below opens up the star distribution
+	#BELOW SECTION: Opens up the star distribution and records necessary values
 	pop = gensim(filename, n=numruns)
+	#Below are star parameters
+	rAraw = pop.stars.radius_A
+	rBraw = pop.stars.radius_B
+	massAraw = pop.stars.mass_A
+	massBraw = pop.stars.mass_B
+	uAraw = pop.stars.Teff_A
+	uBraw = pop.stars.Teff_B
 	
-	#Below generates random parameter distributions
+	#BELOW SECTION: Shuffles generated star parameters
+	#Below generates random indices
+	indices = np.arange(numruns) #Array of indices
+	np.random.shuffle(indices) #Shuffles indices
+	
+	#Below creates blank arrays to hold shuffled star parameters
+	rA = np.zeros(numruns)
+	rB = np.zeros(numruns)
+	massA = np.zeros(numruns)
+	massB = np.zeros(numruns)
+	uA = np.zeros(numruns)
+	uB = np.zeros(numruns)
+	
+	#Below fills the blank arrays with shuffled values
+	for a in range(0, numruns):
+		rA[a] = rAraw[indices[a]]
+		rB[a] = rBraw[indices[a]]
+		massA[a] = massAraw[indices[a]]
+		massB[a] = massBraw[indices[a]]
+		uA[a] = uAraw[indices[a]]
+		uB[a] = uBraw[indices[a]]
+	
+	#BELOW SECTION: Generates random parameter distributions
 	periods = makeperiod(numruns, periodp) #Power law distribution
 	eccs = makeecc(numruns, ecca, eccb) #Beta distribution
 	angles = makeangle(numruns) #Uniform distribution
-	imps = makeimp(numruns, pop.stars.radius_A, pop.stars.radius_B) #Uniform distribution
-	semi = calcsemimajor(period=periods, massstar=pop.stars.mass_A)
-	omegas = calcomega(semi=semi, imp=imps, angle=angles, rs=pop.stars.radius_A, ecc=eccs) #Uniform distribution
+	imps = makeimp(numruns, rA, rB) #Uniform distribution
+	semi = calcsemimajor(period=periods, massstar=massA)
+	omegas = calcomega(semi=semi, imp=imps, angle=angles, rs=rA, ecc=eccs) #Uniform distribution
 	
-	#Below calculates transit values
-	transitvals = calctransit(mass1=pop.stars.mass_A, massp=pop.stars.mass_B, r1=pop.stars.radius_A, r2=pop.stars.radius_B, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=pop.stars.Teff_A, u2=pop.stars.logg_A, numruns=numruns)
+	#BELOW SECTION: Calculates transit values
+	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, numruns=numruns)
+	
+	#BELOW SECTION: Graphs transit values if passed-in parameter 'plot' set as 'True'
+	if plot == True:
+		graph.scatter(transitvals['T14'], transitvals['depthapprox'], s=4)
+		graph.show()
+		
+		graph.scatter(transitvals['T23'], transitvals['depthapprox'], s=4)
+		graph.show()
 	
 	#Below returns the calculated values
 	return transitvals
@@ -198,7 +236,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		depthexact = ((rp/rs)**2.0)*numeratorex/denominatorex
 	
 	#BELOW SECTION: Returns the calculated values
-	done = {'T14':T14, 'T23':T23, 'prob':prob, 'depthappr':depthappr, 'depthexact':depthexact}
+	done = {'T14':T14, 'T23':T23, 'prob':prob, 'depthapprox':depthappr, 'depthexact':depthexact}
 
 	#Below returns generated values
 	return done
