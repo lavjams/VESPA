@@ -7,18 +7,21 @@
 
 #Below imports necessary packages
 import numpy as np
+import math as calc
 import matplotlib.pyplot as graph
 import astropy.constants as const
 
 #Below imports necessary constants
 #Below are some constant values
-daysecs = 86400 #Number of seconds in a day
+daysecs = 86400.0 #Number of seconds in a day
 masssun = const.M_sun.cgs.value #Mass of Sun in grams
+massearth = const.M_earth.cgs.value #Mass of Earth in grams
 Gconst = const.G.cgs.value #Gravitational constant, cgs
-rsun = const.R_sun.cgs.value #Radius of sun, cgs
+rsun = const.R_sun.cgs.value #Radius of Sun, cgs
+eccearth = 0.01671123 #Eccentricty of Earth's orbit; ###FIND EXACT VALUE!
 au = const.au.cgs.value #Astronomical unit, cgs
 pi = np.pi #Value of pi
-	
+
 
 ##FUNCTION: gensim ###NOT TESTED
 #Purpose: This function is meant to run a star simulation to generate a population of stars and statistics
@@ -68,52 +71,156 @@ def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=None, MAfn=None,
 #Purpose: This function is meant to run a star simulation to generate a population of stars and statistics, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
 #Numruns indicates the number of stars.
 #Dependencies:
-def runmodel(filename='samplepop.h5', periodp=2, ecca=0.5, eccb=0.5, numruns=1e3, plot=False, **kwargs):
+def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, plot=False, **kwargs):
 	#Below calls an error if given file as nonexistent
 	import os.path
 	if os.path.isfile(filename) is False:
 		raise ValueError("Please pass in an existent file name.")
 	
 	#BELOW SECTION: Opens up the star distribution and records necessary values
-	pop = gensim(filename, n=numruns)
+#	totalruns = numruns*100
+	pop = gensim(filename)#, n=totalruns)
 	#Below are star parameters
-	rAraw = pop.stars.radius_A
-	rBraw = pop.stars.radius_B
-	massAraw = pop.stars.mass_A
-	massBraw = pop.stars.mass_B
-	uAraw = pop.stars.Teff_A
-	uBraw = pop.stars.Teff_B
-	
+	rAraw = pop.stars.radius_A#[0:totalruns]
+	rBraw = pop.stars.radius_B#[0:totalruns]
+	massAraw = pop.stars.mass_A#[0:totalruns]
+	massBraw = pop.stars.mass_B#[0:totalruns]
+	uAraw = pop.stars.Teff_A#[0:totalruns]
+	uBraw = pop.stars.Teff_B#[0:totalruns]
+	totalruns = len(rAraw)
+
 	#BELOW SECTION: Shuffles generated star parameters
 	#Below generates random indices
-	indices = np.arange(numruns) #Array of indices
-	np.random.shuffle(indices) #Shuffles indices
+#	indices = np.arange(numruns) #Array of indices
+#	np.random.shuffle(indices) #Shuffles indices
 	
 	#Below creates blank arrays to hold shuffled star parameters
+#	rA = np.zeros(numruns)
+#	rB = np.zeros(numruns)
+#	massA = np.zeros(numruns)
+#	massB = np.zeros(numruns)
+#	uA = np.zeros(numruns)
+#	uB = np.zeros(numruns)
+	
+	#Below fills the blank arrays with shuffled values
+#	for a in range(0, numruns):
+#		rA[a] = rAraw[indices[a]]
+#		rB[a] = rBraw[indices[a]]
+#		massA[a] = massAraw[indices[a]]
+#		massB[a] = massBraw[indices[a]]
+#		uA[a] = uAraw[indices[a]]
+#		uB[a] = uBraw[indices[a]]
+	
+	#BELOW SECTION: Generates random parameter distributions
+	eccs = makeecc(numruns, ecca, eccb) #Beta distribution
+
+	#Below generates angles and imps
+	angles = makeangle(numruns)
+	imps = makeimp(rAraw, rBraw)
+	
+	#Below calculates omegas; throws out any invalid omega values
+	omegas = np.zeros(numruns)
 	rA = np.zeros(numruns)
 	rB = np.zeros(numruns)
 	massA = np.zeros(numruns)
 	massB = np.zeros(numruns)
 	uA = np.zeros(numruns)
 	uB = np.zeros(numruns)
+	periods = np.zeros(numruns)
 	
-	#Below fills the blank arrays with shuffled values
-	for a in range(0, numruns):
-		rA[a] = rAraw[indices[a]]
-		rB[a] = rBraw[indices[a]]
-		massA[a] = massAraw[indices[a]]
-		massB[a] = massBraw[indices[a]]
-		uA[a] = uAraw[indices[a]]
-		uB[a] = uBraw[indices[a]]
+	track = 0 #Track number of valid calculations
+	tryhere = 0 #Track place in original totalrun arrays
+	periodhere = 0 ######################
+	while track < numruns:
+		#Below selects larger radius from rA and rB
+		rhere = 0
+		rnothere = 0
+		if rAraw[track] > rBraw[track]:
+			rhere = rAraw[track]
+			rnothere = rBraw[track]
+		elif rAraw[track] <= rBraw[track]:
+			rhere = rBraw[track]
+			rnothere = rAraw[track]
+		
+		#Below generates period here
+		periodhere = makeperiod(1, periodp)*daysecs
+		#Power law distribution, converted to seconds
+
+		#Below computes omega with current values
+		semi = calcsemimajor(period=periodhere, massstar=massAraw[track])		
+		omegahere = calcomega(semi=semi, imp=imps[track], angle=angles[track], rs=rhere, ecc=eccs[track])
+		
+		################################## TEMP BORROW
+		
+		tooclose = withinroche(semi*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
+		print('Is this period too close? ', tooclose) #############
+		ntooclose = np.array(tooclose).sum()
+		tries = 0
+		maxtries = 5
+		while ntooclose > 0:
+			lastntooclose=ntooclose
+			periodhere = makeperiod(1, periodp)*daysecs
+
+			semimajors = calcsemimajor(periodhere, (massA[track]+massB[track])
+			tooclose = withinroche(semimajors*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
+			ntooclose = np.array(tooclose).sum()
+			if ntooclose==lastntooclose:   #prevent infinite loop
+				tries += 1
+				if tries > maxtries:
+					raise ValueError("Too many withinroche!")
+					                       
+
+		########################## END OF TEMP BORROW
+		
+		
+		
+		if not calc.isnan(omegahere):
+			
+		#Below keeps data if valid omega parameter was produced; throws out otherwise
+		
+#		if calc.isnan(omegahere): #If not valid omega produced
+#			placehere = placehere + 1
+#			if placehere >= totalruns and track < (numruns - 1):
+#				print('track as ', track) ###########
+#				raise ValueError("Oh no!  Ran out of totalrun values to choose from.  Better make totalrun values larger, perhaps.")
+#		else: #If valid omega produced
+			omegas[track] = omegahere
+			rA[track] = rAraw[track]
+			rB[track] = rBraw[track]
+			massA[track] = massAraw[track]
+			massB[track] = massBraw[track]
+			uA[track] = uAraw[track]
+			uB[track] = uBraw[track]
+			periods[track] = periodhere/daysecs
+			
+			print("Success!  At track ", track)
+			print("With period here of ", periodhere)
+			track = track + 1
+			tryhere = 0
+		else:
+			tryhere = tryhere + 1
+			if tryhere >= 10000:
+				print('tryhere reached ', tryhere)
+				print('Current track as ', track)
+				raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
+
+			#Below increments counts and tracking variables
+#			track = track + 1
+#			placehere = placehere + 1
+#			if placehere >= totalruns and track < (numruns - 1):
+#				print('track as ', track) #############
+#				raise ValueError("Oh no!  Ran out of totalrun values to choose from.  Better make totalrun values larger, perhaps.")
+
+			
 	
-	#BELOW SECTION: Generates random parameter distributions
-	periods = makeperiod(numruns, periodp) #Power law distribution
-	eccs = makeecc(numruns, ecca, eccb) #Beta distribution
-	angles = makeangle(numruns) #Uniform distribution
-	imps = makeimp(numruns, rA, rB) #Uniform distribution
-	semi = calcsemimajor(period=periods, massstar=massA)
-	omegas = calcomega(semi=semi, imp=imps, angle=angles, rs=rA, ecc=eccs) #Uniform distribution
-	
+	print('new imps as ', imps) ############
+	print('new omegas as ', omegas) ###############
+	print('mass1*masssun as ', massA*masssun) #############
+	print('r1*rsun as ', rA*rsun) ###############
+	print('r2*rsun as ', rB*rsun) #################
+	print('semi as ', semi) ##############
+	print('periods as ', periods/daysecs) ###########
+		
 	#BELOW SECTION: Calculates transit values
 	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, numruns=numruns)
 	
@@ -130,11 +237,14 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=0.5, eccb=0.5, numruns=1e3
 ##
 
 
+
+
+###BASE CALCULATIONS
 ##FUNCTION: calctransit
 #Purpose: This function is meant to accept several inputs in cgs units (except for period, which should be given in days), including primary and orbiting masses (mass1 and massp), primary and orbiting radii (r1 and r2), a period (period), eccentricity (ecc), omega (omega), angle (angle), impact parameter (imp), and limb darkening (u1 and u2).
 #It calculates analytically several aspects of the transit curve, including full width (T14), mid width (T23), transit probability (prob), exact depth (depthexact), and approximate depth (depthappr).
 #Dependencies: calcsemimajor
-def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, numruns=1e3, **kwargs):
+def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, numruns=100, **kwargs):
 	#Below makes sure necessary parameters have been passed
 	if mass1 is None or massp is None or r1 is None or r2 is None or period is None or ecc is None or angle is None or imp is None:
 		raise ValueError('Please pass in all of the following parameters with correct values using cgs units (except for period, which should be given in days): mass1 (primary mass), massp (orbiting mass), r1 and r2 (primary and orbiting radius), period (the period), ecc (eccentricity), angle (given as i usually), and imp (impact parameter b).')
@@ -196,7 +306,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 			u2 = u2[0:numruns]
 
 	#Below formulates some basic values
-	semi = calcsemimajor(period, mass1) #Semimajor axis
+	semi = calcsemimajor(period, (mass1+massp)) #Semimajor axis
 		
 		
 	#BELOW SECTION: Calculates transit times, probability, and whatnot
@@ -218,7 +328,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	#Below calculates transit probability
 	prob = "You didn't specify omega.  Therefore the transit probability was not generated."
 	if omega is not None:
-		constprr = (rs + rp)/semi
+		constprr = (rs + rp)*rsun/semi
 		constpre = (1 + (ecc*np.sin(omega*pi/180.0))) / (1 - ecc**2.0)
 		prob = constprr * constpre
 	
@@ -243,11 +353,154 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 ##
 
 
+##FUNCTION: calcsemimajor
+#Purpose: This function calculates the semimajor axis (in centimeters) using a given star mass (in grams) and period (in days)
+def calcsemimajor(period, massstar):
+	#Below converts the period from days to seconds
+	periodsecs = period#*daysecs
+	
+	#Semimajor axis formula, by Kepler's Law:
+	#T^2/a^3 = (4*pi^2 / (G*Mstar))
+	
+	#Below calculates the semimajor axis
+	const = (Gconst*massstar*masssun)/(4.0*pi**2.0)
+	semimajoraxis = (const*periodsecs**2.0)**(1.0/3.0)
+
+	#Below returns calculated value
+	return semimajoraxis #In centimeters
+##
+
+
+##FUNCTION: calcomega
+#Purpose: This function calculates omega based upon the given semimajor axis (semi), impact parameter (imp), eccentricity (ecc), primary radius (rs), and angle (angle).
+def calcomega(semi, imp, ecc, rs, angle):
+	#Omega formula derived from Winn paper on Transits and Occultations
+	frac1 = (semi*np.cos(angle*pi/180.0)) * (1.0 - ecc**2.0) / (rs*imp*rsun)
+#	print('Calculating omega!') ##############
+#	print('frac1 part1 as ', (semi*np.cos(angle*pi/180.0))) ########
+#	print('frac1 as ', frac1) ############
+#	print('') #############
+	frac2 = (frac1 - 1.0) / ecc
+#	print('rs*rsun as ', rs*rsun) ###############
+#	print('')
+#	print('semi as ', semi) #################
+#	print('')
+#	print('frac2 as ', frac2) ####################
+	omega = np.arcsin(frac2)*180.0/pi
+	
+	#################
+#	print('')
+#	print('frac2 as ', frac2)
+#	print('')
+#	print('omega as ', omega) #####
+	#################
+	#Below returns calculated omega
+	return omega
+##
+
+
+##FUNCTION: calcimp
+#Purpose: This function calculates the impact parameter (usually given as b) analytically using a given angle (usually denoted by i), eccentricity (ecc), semimajor axis (semi), primary radius (rs), and omega (omega).
+def calcimp(ecc, angle, semi, rs, omega):
+	#Impact parameter formula derived from Winn paper on Transits and Occultations
+	frac1 = (semi*np.cos(angle*pi/180.0)) / (rs * rsun)
+	frac2 = (1 - ecc**2.0)
+	bot1 = (1.0 + (ecc*np.sin(omega*pi/180.0)))
+
+	#Below returns the calculated impact parameter
+	imp = frac1*frac2/bot1
+	return imp
+##
+
+
+##FUNCTION: makeimp
+#Purpose: Below as a method to return a given number (n) of impact parameters, sampled uniformly between 0 and (rs + rp)/rs, where rs = star radius, rp = orbiting radius.
+def makeimp(r1, r2):
+	#Below imports basic packages
+	import random as rand
+	
+	#Below sets the primary and orbiting radii based on which one is larger
+	if isinstance(r1, int):
+		r1 = np.array([r1])
+		r2 = np.array([r2])
+	rs = np.zeros(len(r1))
+	rp = np.zeros(len(r1))
+
+	for f in range(0, len(r1)):
+		if (r1[f] > r2[f]):
+			rs[f] = r1[f]
+			rp[f] = r2[f]
+		elif (r2[f] >= r1[f]):
+			rs[f] = r2[f]
+			rp[f] = r1[f]
+	
+	#Below samples random numbers between 0 and endrange
+	endrange = (rs + rp)/rs
+	randdist = np.zeros(len(r1))
+	for b in range(0, len(r1)):
+		randdist[b] = rand.random() * endrange[b]
+	
+	#Below returns uniform unscaled impact parameter results
+	return randdist
+##
+
+
+##FUNCTION: makeangle
+#Purpose: Below as a method to return a given number (n) of angles, sampled uniformly between 0 and 360 degrees.
+def makeangle(n):
+	#Below imports basic packages
+	import random as rand
+	n = int(n)
+	
+	#Below samples random numbers between 0 and endrange
+	endrange = 360
+	randdist = np.zeros(n)
+	for c in range(0, n):
+		randdist[c] = rand.random() * endrange
+	
+	#Below generates uniform angle results
+	return randdist
+##
+
+	
+##FUNCTION: makeperiod
+#Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
+def makeperiod(n, p):
+	#Below imports basic packages
+	import random as rand
+	n = int(n)
+	
+	#Below samples random numbers between 0 and endrange
+	endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+	randnum = np.zeros(n) #To hold random numbers
+	for a in range(0, n):
+		randnum[a] = rand.random() * endrange
+	
+	#Below generates the power law results
+	perdone = randnum**p
+	return perdone
+##
+
+
+##FUNCTION: makeecc
+#Purpose: Below as method to return a given number of eccentricities, sampled from a Beta Distribution
+def makeecc(n, a, b):
+	#Below imports basic packages
+	from scipy.stats import beta
+	n = int(n)
+	
+	#Below returns an array of values sampled from beta distribution with given parameters (a, b) and of size n
+	eccdone = beta.rvs(a, b, size = n)
+	return eccdone
+##
+	
+	
+	
 
 ###TESTS
 ##TEST: testcalctransit
 #Purpose: This test is meant to test the calctransit function
-def testcalctransit(filename, numruns=1e3, **kwargs):
+def testcalctransit(filename, numruns=100, **kwargs):
 	#Below calls an error if given file as nonexistent
 	import os.path
 	if os.path.isfile(filename) is False:
@@ -305,135 +558,13 @@ def testcalctransit(filename, numruns=1e3, **kwargs):
 	testfile.write('\n\n')	
 ##
 
+########################
+def rochelobe(q):
+    """returns r1/a; q = M1/M2"""
+    return 0.49*q**(2./3)/(0.6*q**(2./3) + np.log(1+q**(1./3)))
 
-###BASE CALCULATIONS
-##FUNCTION: calcsemimajor
-#Purpose: This function calculates the semimajor axis (in centimeters) using a given star mass (in grams) and period (in days)
-def calcsemimajor(period, massstar):
-	#Below converts the period from days to seconds
-	periodsecs = period*daysecs
-	
-	#Semimajor axis formula, by Kepler's Law:
-	#T^2/a^3 = (4*pi^2 / (G*Mstar))
-	
-	#Below calculates the semimajor axis
-	const = (Gconst*massstar*masssun)/(4.0*pi**2.0)
-	semimajoraxis = (const*periodsecs**2.0)**(1.0/3.0)
-	
-	#Below returns calculated value
-	return semimajoraxis #In centimeters
-##
+def withinroche(semimajors,M1,R1,M2,R2):
+    q = M1/M2
+    return ((R1+R2)*RSUN) > (rochelobe(q)*semimajors)
 
-
-##FUNCTION: calcomega
-#Purpose: This function calculates omega based upon the given semimajor axis (semi), impact parameter (imp), eccentricity (ecc), primary radius (rs), and angle (angle).
-def calcomega(semi, imp, ecc, rs, angle):
-	#Omega formula derived from Winn paper on Transits and Occultations
-	frac1 = (rs*imp) / (semi*np.cos(angle*pi/180.0)) / (1.0 - ecc**2.0)
-	frac2 = (frac1 - 1.0) / ecc
-	omega = np.arcsin(frac2)
-	
-	#Below returns calculated omega
-	return omega
-##
-
-
-##FUNCTION: calcimp
-#Purpose: This function calculates the impact parameter (usually given as b) analytically using a given angle (usually denoted by i), eccentricity (ecc), semimajor axis (semi), primary radius (rs), and omega (omega).
-def calcimp(ecc, angle, semi, rs, omega):
-	#Impact parameter formula derived from Winn paper on Transits and Occultations
-	frac1 = (semi*np.cos(angle*pi/180.0)) / (rs * rsun)
-	frac2 = (1 - ecc**2.0)
-	bot1 = (1.0 + (ecc*np.sin(omega*pi/180.0)))
-	
-	#Below returns the calculated impact parameter
-	imp = frac1*frac2/bot1
-	return imp
-##
-
-
-##FUNCTION: makeimp
-#Purpose: Below as a method to return a given number (n) of impact parameters, sampled uniformly between 0 and (rs + rp)/rs, where rs = star radius, rp = orbiting radius.
-def makeimp(n, r1, r2):
-	#Below imports basic packages
-	import random as rand
-	n = int(n)
-	
-	#Below sets the primary and orbiting radii based on which one is larger
-	rs = np.zeros(len(r1))
-	rp = np.zeros(len(r1))
-	for f in range(0, len(r1)):
-		if (r1[f] > r2[f]):
-			rs[f] = r1[f]
-			rp[f] = r2[f]
-		elif (r2[f] >= r1[f]):
-			rs[f] = r2[f]
-			rp[f] = r1[f]
-	
-	
-	#Below samples random numbers between 0 and endrange
-	endrange = (rs + rp)/rs
-	randdist = np.zeros(n)
-	for b in range(0, n):
-		randdist[b] = rand.random() * endrange[b]
-	
-	#Below generates uniform impact parameter results
-	return randdist
-##
-
-
-##FUNCTION: makeangle
-#Purpose: Below as a method to return a given number (n) of angles, sampled uniformly between 0 and 360 degrees.
-def makeangle(n):
-	#Below imports basic packages
-	import random as rand
-	n = int(n)
-	
-	#Below samples random numbers between 0 and endrange
-	endrange = 360
-	randdist = np.zeros(n)
-	for c in range(0, n):
-		randdist[c] = rand.random() * endrange
-	
-	#Below generates uniform angle results
-	return randdist
-##
-
-	
-##FUNCTION: makeperiod
-#Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-def makeperiod(n, p):
-	#Below imports basic packages
-	import random as rand
-	n = int(n)
-	
-	#Below samples random numbers between 0 and endrange
-	endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
-	randnum = np.zeros(n) #To hold random numbers
-	for a in range(0, n):
-		randnum[a] = rand.random() * endrange
-	
-	#Below generates the power law results
-	perdone = randnum**p
-	return perdone
-##
-
-
-##FUNCTION: makeecc
-#Purpose: Below as method to return a given number of eccentricities, sampled from a Beta Distribution
-def makeecc(n, a, b):
-	#Below imports basic packages
-	from scipy.stats import beta
-	n = int(n)
-	
-	#Below returns an array of values sampled from beta distribution with given parameters (a, b) and of size n
-	eccdone = beta.rvs(a, b, size = n)
-	return eccdone
-##
-	
-	
-	
-
-	
-	
 	
