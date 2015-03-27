@@ -116,7 +116,7 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 
 	#Below generates angles and imps
 	angles = makeangle(numruns)
-	imps = makeimp(rAraw, rBraw)
+	impsraw = makeimp(rAraw, rBraw)
 	
 	#Below calculates omegas; throws out any invalid omega values
 	omegas = np.zeros(numruns)
@@ -127,33 +127,68 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 	uA = np.zeros(numruns)
 	uB = np.zeros(numruns)
 	periods = np.zeros(numruns)
+	imps = np.zeros(numruns)
+	semitesting = np.zeros(numruns) #For TESTING purposes
 	
 	track = 0 #Track number of valid calculations
-	tryhere = 0 #Track place in original totalrun arrays
-	periodhere = 0 ######################
+	tryhere = 0 #Track number of tried periods
+	totalplace = 0 #Track place in original total arrays
 	while track < numruns:
 		#Below selects larger radius from rA and rB
 		rhere = 0
 		rnothere = 0
-		if rAraw[track] > rBraw[track]:
-			rhere = rAraw[track]
-			rnothere = rBraw[track]
-		elif rAraw[track] <= rBraw[track]:
-			rhere = rBraw[track]
-			rnothere = rAraw[track]
+		#Below skips current place in total arrays if zero-valued radii
+		if rAraw[totalplace] == 0 and rBraw[totalplace] == 0:
+			totalplace = totalplace + 1
+			continue
+		#Below skips current place if nans in radii
+		if calc.isnan(rAraw[totalplace]) or calc.isnan(rBraw[totalplace]):
+			totalplace = totalplace + 1
+			continue
 		
-		#Below generates period here
-		periodhere = makeperiod(1, periodp)*daysecs
-		#Power law distribution, converted to seconds
+		#Below assigns larger and smaller radii at this spot
+		if rAraw[totalplace] > rBraw[totalplace]:
+			rhere = rAraw[totalplace]
+			rnothere = rBraw[totalplace]
+		elif rAraw[totalplace] <= rBraw[totalplace]:
+			rhere = rBraw[totalplace]
+			rnothere = rAraw[totalplace]
+		
+		
+		
+		#######TRY to determine range of allowed period values
+		#Below determines range of allowed period values
+		highestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=360.0)
+		lowestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=270.0)
 
+		highestperiod = calcperiod(semi=highestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
+		lowestperiod = calcperiod(semi=lowestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
+	
+		#Below generates period here
+		periodhere = makeperiod(1, periodp, rangestart=lowestperiod, rangeend=highestperiod)#*daysecs
+		#Power law distribution, converted to seconds
 		#Below computes omega with current values
-		semi = calcsemimajor(period=periodhere, massstar=massAraw[track])		
-		omegahere = calcomega(semi=semi, imp=imps[track], angle=angles[track], rs=rhere, ecc=eccs[track])
+		semi = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
+		if highestsemi < 0: #Temp fix for sign issues of semi
+			semi = semi*(-1)
 		
+		omegahere = calcomega(semi=semi, imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track])
+		
+		
+		###################
+#		print('')
+#		print('currently, highest period as ', highestperiod)
+#		print('lowest period as ', lowestperiod)
+#		print('highest semi as ', highestsemi)
+#		print('lowest semi as ', lowestsemi)
+#		print('period here is ', periodhere)
+#		print('semi as ', semi)
+#		print('omegahere as ', omegahere)
+		###################
+
 		################################## TEMP BORROW
-		
-		tooclose = withinroche(semi*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
-		print('Is this period too close? ', tooclose) #############
+		"""
+		tooclose = withinroche(semi/au*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
 		ntooclose = np.array(tooclose).sum()
 		tries = 0
 		maxtries = 5
@@ -161,14 +196,16 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 			lastntooclose=ntooclose
 			periodhere = makeperiod(1, periodp)*daysecs
 
-			semimajors = calcsemimajor(periodhere, (massA[track]+massB[track])
-			tooclose = withinroche(semimajors*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
+			semimajors = calcsemimajor(periodhere, (massA[track]+massB[track]))
+			
+			tooclose = withinroche(semimajors/au*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
+			
 			ntooclose = np.array(tooclose).sum()
 			if ntooclose==lastntooclose:   #prevent infinite loop
 				tries += 1
 				if tries > maxtries:
 					raise ValueError("Too many withinroche!")
-					                       
+		"""			                       
 
 		########################## END OF TEMP BORROW
 		
@@ -185,22 +222,41 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 #				raise ValueError("Oh no!  Ran out of totalrun values to choose from.  Better make totalrun values larger, perhaps.")
 #		else: #If valid omega produced
 			omegas[track] = omegahere
-			rA[track] = rAraw[track]
-			rB[track] = rBraw[track]
-			massA[track] = massAraw[track]
-			massB[track] = massBraw[track]
-			uA[track] = uAraw[track]
-			uB[track] = uBraw[track]
+			semitesting[track] = semi
+			imps[track] = impsraw[totalplace]
+			rA[track] = rAraw[totalplace]
+			rB[track] = rBraw[totalplace]
+			massA[track] = massAraw[totalplace]
+			massB[track] = massBraw[totalplace]
+			uA[track] = uAraw[totalplace]
+			uB[track] = uBraw[totalplace]
 			periods[track] = periodhere/daysecs
 			
-			print("Success!  At track ", track)
+			print("Success!  At track ", track, ' and tryhere ', tryhere)
+			print("Also with totalplace of ", totalplace)
 			print("With period here of ", periodhere)
 			track = track + 1
+			totalplace = totalplace + 1
 			tryhere = 0
 		else:
 			tryhere = tryhere + 1
 			if tryhere >= 10000:
+				print("Oh no!  Tryhere was reached.")
+				print("Current values:")
+				print('periodhere as ', periodhere)
+				print('semi here as ', semi)
+				print('highestperiod as ', highestperiod)
+				print('lowestperiod as ', lowestperiod)
+				print('highestsemi as ', highestsemi)
+				print('lowestsemi as ', lowestsemi)
+				print('ra here as ', rhere)
+				print('rb here as ', rnothere)
+				print('massa here as ', massAraw[totalplace])
+				print('massb here as ', massBraw[totalplace])
+				
+				print('')
 				print('tryhere reached ', tryhere)
+				print('totalplace reached ', totalplace)
 				print('Current track as ', track)
 				raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
 
@@ -218,7 +274,7 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 	print('mass1*masssun as ', massA*masssun) #############
 	print('r1*rsun as ', rA*rsun) ###############
 	print('r2*rsun as ', rB*rsun) #################
-	print('semi as ', semi) ##############
+	print('semi as ', semitesting) ##############
 	print('periods as ', periods/daysecs) ###########
 		
 	#BELOW SECTION: Calculates transit values
@@ -413,6 +469,25 @@ def calcimp(ecc, angle, semi, rs, omega):
 ##
 
 
+##FUNCTION: calcimpactsemi
+#Purpose: Below as a method to calculate semimajor axis from given impact parameter values.
+def calcimpactsemi(ecc, angle, rs, omega, imp):
+	#Formula derived from Winn paper on Transits and Occultations
+	part1 = (imp*rs*rsun) / np.cos(angle*pi/180.0)
+	part2 = (1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
+	
+	return (part1/part2)
+	
+
+##FUNCTION: calcperiod
+#Purpose: Below as a method to calculate period based on Kepler's Third Law.
+def calcperiod(semi, massstar):
+	part1 = 4*pi**2.0/(Gconst*massstar*masssun)
+	part2 = part1*semi**3.0
+		
+	return (abs(part2))**(1/2.0)
+	
+	
 ##FUNCTION: makeimp
 #Purpose: Below as a method to return a given number (n) of impact parameters, sampled uniformly between 0 and (rs + rp)/rs, where rs = star radius, rp = orbiting radius.
 def makeimp(r1, r2):
@@ -465,20 +540,32 @@ def makeangle(n):
 	
 ##FUNCTION: makeperiod
 #Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-def makeperiod(n, p):
+def makeperiod(n, p, rangestart=None, rangeend=None):
 	#Below imports basic packages
 	import random as rand
 	n = int(n)
 	
-	#Below samples random numbers between 0 and endrange
-	endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
-	randnum = np.zeros(n) #To hold random numbers
-	for a in range(0, n):
-		randnum[a] = rand.random() * endrange
+	#BELOW SECTION: Samples random numbers in a certain range
+	#If no range given, then samples between zero and endrange generated below
+	if rangestart is None or rangeend is None:
+		endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
+		randnum = np.zeros(n) #To hold random numbers
+		for a in range(0, n):
+			randnum[a] = rand.random() * endrange
 	
-	#Below generates the power law results
-	perdone = randnum**p
-	return perdone
+		#Below generates the power law results
+		perdone = randnum**p
+		return perdone
+		
+	#If range is given, then samples from between endrange
+	elif rangestart is not None and rangeend is not None:
+		randinrange = np.zeros(n) #To hold random numbers
+		for b in range(0, n):
+			randinrange[b] = rand.uniform(rangestart**(1.0/p), rangeend**(1.0/p))
+			
+		#Below generates the power law results
+		perdone = randinrange**p
+		return perdone
 ##
 
 
@@ -565,6 +652,6 @@ def rochelobe(q):
 
 def withinroche(semimajors,M1,R1,M2,R2):
     q = M1/M2
-    return ((R1+R2)*RSUN) > (rochelobe(q)*semimajors)
+    return ((R1+R2)*rsun) > (rochelobe(q)*semimajors)
 
 	
