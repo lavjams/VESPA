@@ -1588,13 +1588,7 @@ def calculate_eclipses(M1s, M2s, R1s, R2s, mag1s, mag2s,
     R_small = switched*R1 + ~switched*R2
     k = R_small/R_large
     
-	#################
-    print('actual semi as ', a) ###############
-    print('actual b_tra as ', b_tra) ##############
-    print('actual omega as ', w) ################
-    print('actual inc as ', inc) ##############
-	###########################
-	
+
     #calculate durations
     T14_tra = P/np.pi*np.arcsin(R_large*RSUN/a * np.sqrt((1+k)**2 - b_tra**2)/np.sin(inc*np.pi/180)) *\
         np.sqrt(1-ecc**2)/(1+ecc*np.sin(w*np.pi/180)) #*24*60

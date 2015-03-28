@@ -72,68 +72,43 @@ def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=None, MAfn=None,
 #Numruns indicates the number of stars.
 #Dependencies:
 def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, plot=False, **kwargs):
-	#Below calls an error if given file as nonexistent
-	import os.path
-	if os.path.isfile(filename) is False:
-		raise ValueError("Please pass in an existent file name.")
+	#Below specifies three times as much data to be used
+	#This allows room to screen out 'nan' values later in calctransit
+	totalruns = numruns*5
 	
 	#BELOW SECTION: Opens up the star distribution and records necessary values
-#	totalruns = numruns*100
-	pop = gensim(filename)#, n=totalruns)
+	pop = gensim(filename)
 	#Below are star parameters
-	rAraw = pop.stars.radius_A#[0:totalruns]
-	rBraw = pop.stars.radius_B#[0:totalruns]
-	massAraw = pop.stars.mass_A#[0:totalruns]
-	massBraw = pop.stars.mass_B#[0:totalruns]
-	uAraw = pop.stars.Teff_A#[0:totalruns]
-	uBraw = pop.stars.Teff_B#[0:totalruns]
-	totalruns = len(rAraw)
+	rAraw = pop.stars.radius_A
+	rBraw = pop.stars.radius_B
+	massAraw = pop.stars.mass_A
+	massBraw = pop.stars.mass_B
+	uAraw = pop.stars.Teff_A
+	uBraw = pop.stars.Teff_B
 
-	#BELOW SECTION: Shuffles generated star parameters
-	#Below generates random indices
-#	indices = np.arange(numruns) #Array of indices
-#	np.random.shuffle(indices) #Shuffles indices
-	
-	#Below creates blank arrays to hold shuffled star parameters
-#	rA = np.zeros(numruns)
-#	rB = np.zeros(numruns)
-#	massA = np.zeros(numruns)
-#	massB = np.zeros(numruns)
-#	uA = np.zeros(numruns)
-#	uB = np.zeros(numruns)
-	
-	#Below fills the blank arrays with shuffled values
-#	for a in range(0, numruns):
-#		rA[a] = rAraw[indices[a]]
-#		rB[a] = rBraw[indices[a]]
-#		massA[a] = massAraw[indices[a]]
-#		massB[a] = massBraw[indices[a]]
-#		uA[a] = uAraw[indices[a]]
-#		uB[a] = uBraw[indices[a]]
-	
 	#BELOW SECTION: Generates random parameter distributions
-	eccs = makeecc(numruns, ecca, eccb) #Beta distribution
-
-	#Below generates angles and imps
-	angles = makeangle(numruns)
+	eccs = makeecc(totalruns, ecca, eccb) #Beta distribution
+	angles = makeangle(totalruns)
 	impsraw = makeimp(rAraw, rBraw)
 	
 	#Below calculates omegas; throws out any invalid omega values
-	omegas = np.zeros(numruns)
-	rA = np.zeros(numruns)
-	rB = np.zeros(numruns)
-	massA = np.zeros(numruns)
-	massB = np.zeros(numruns)
-	uA = np.zeros(numruns)
-	uB = np.zeros(numruns)
-	periods = np.zeros(numruns)
-	imps = np.zeros(numruns)
-	semitesting = np.zeros(numruns) #For TESTING purposes
+	omegas = np.zeros(totalruns)
+	rA = np.zeros(totalruns)
+	rB = np.zeros(totalruns)
+	massA = np.zeros(totalruns)
+	massB = np.zeros(totalruns)
+	uA = np.zeros(totalruns)
+	uB = np.zeros(totalruns)
+	periods = np.zeros(totalruns)
+	imps = np.zeros(totalruns)
+	semitesting = np.zeros(totalruns) #For TESTING purposes
 	
+	#BELOW SECTION: Ensures only valid periods are produced
+	#Also ensures only valid radii are used
 	track = 0 #Track number of valid calculations
 	tryhere = 0 #Track number of tried periods
 	totalplace = 0 #Track place in original total arrays
-	while track < numruns:
+	while track < totalruns:
 		#Below selects larger radius from rA and rB
 		rhere = 0
 		rnothere = 0
@@ -155,72 +130,26 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 			rnothere = rAraw[totalplace]
 		
 		
-		
-		#######TRY to determine range of allowed period values
-		#Below determines range of allowed period values
-		highestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=360.0)
+		#BELOW determines range of allowed period values
+		#Allowed semi values
+		highestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=90.0)
 		lowestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=270.0)
-
+		#Derived period values
 		highestperiod = calcperiod(semi=highestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
 		lowestperiod = calcperiod(semi=lowestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
-	
+		
 		#Below generates period here
-		periodhere = makeperiod(1, periodp, rangestart=lowestperiod, rangeend=highestperiod)#*daysecs
-		#Power law distribution, converted to seconds
+		periodhere = makeperiod(1, periodp, rangestart=lowestperiod, rangeend=highestperiod)
+
 		#Below computes omega with current values
 		semi = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
 		if highestsemi < 0: #Temp fix for sign issues of semi
 			semi = semi*(-1)
 		
-		omegahere = calcomega(semi=semi, imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track])
-		
-		
-		###################
-#		print('')
-#		print('currently, highest period as ', highestperiod)
-#		print('lowest period as ', lowestperiod)
-#		print('highest semi as ', highestsemi)
-#		print('lowest semi as ', lowestsemi)
-#		print('period here is ', periodhere)
-#		print('semi as ', semi)
-#		print('omegahere as ', omegahere)
-		###################
+		omegahere = calcomega(semi=semi, imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], shift=True)
 
-		################################## TEMP BORROW
-		"""
-		tooclose = withinroche(semi/au*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
-		ntooclose = np.array(tooclose).sum()
-		tries = 0
-		maxtries = 5
-		while ntooclose > 0:
-			lastntooclose=ntooclose
-			periodhere = makeperiod(1, periodp)*daysecs
-
-			semimajors = calcsemimajor(periodhere, (massA[track]+massB[track]))
-			
-			tooclose = withinroche(semimajors/au*(1-eccs[track]),massA[track],rA[track],massB[track],rB[track])
-			
-			ntooclose = np.array(tooclose).sum()
-			if ntooclose==lastntooclose:   #prevent infinite loop
-				tries += 1
-				if tries > maxtries:
-					raise ValueError("Too many withinroche!")
-		"""			                       
-
-		########################## END OF TEMP BORROW
-		
-		
-		
-		if not calc.isnan(omegahere):
-			
 		#Below keeps data if valid omega parameter was produced; throws out otherwise
-		
-#		if calc.isnan(omegahere): #If not valid omega produced
-#			placehere = placehere + 1
-#			if placehere >= totalruns and track < (numruns - 1):
-#				print('track as ', track) ###########
-#				raise ValueError("Oh no!  Ran out of totalrun values to choose from.  Better make totalrun values larger, perhaps.")
-#		else: #If valid omega produced
+		if not calc.isnan(omegahere):
 			omegas[track] = omegahere
 			semitesting[track] = semi
 			imps[track] = impsraw[totalplace]
@@ -230,53 +159,22 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 			massB[track] = massBraw[totalplace]
 			uA[track] = uAraw[totalplace]
 			uB[track] = uBraw[totalplace]
-			periods[track] = periodhere/daysecs
+			periods[track] = periodhere
 			
-			print("Success!  At track ", track, ' and tryhere ', tryhere)
-			print("Also with totalplace of ", totalplace)
-			print("With period here of ", periodhere)
+			#Below increments counts
 			track = track + 1
 			totalplace = totalplace + 1
 			tryhere = 0
-		else:
+
+		else: #If too many tries used, terminates
 			tryhere = tryhere + 1
-			if tryhere >= 10000:
-				print("Oh no!  Tryhere was reached.")
-				print("Current values:")
-				print('periodhere as ', periodhere)
-				print('semi here as ', semi)
-				print('highestperiod as ', highestperiod)
-				print('lowestperiod as ', lowestperiod)
-				print('highestsemi as ', highestsemi)
-				print('lowestsemi as ', lowestsemi)
-				print('ra here as ', rhere)
-				print('rb here as ', rnothere)
-				print('massa here as ', massAraw[totalplace])
-				print('massb here as ', massBraw[totalplace])
-				
-				print('')
+			if tryhere >= 1:
 				print('tryhere reached ', tryhere)
 				print('totalplace reached ', totalplace)
 				print('Current track as ', track)
 				raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
 
-			#Below increments counts and tracking variables
-#			track = track + 1
-#			placehere = placehere + 1
-#			if placehere >= totalruns and track < (numruns - 1):
-#				print('track as ', track) #############
-#				raise ValueError("Oh no!  Ran out of totalrun values to choose from.  Better make totalrun values larger, perhaps.")
 
-			
-	
-	print('new imps as ', imps) ############
-	print('new omegas as ', omegas) ###############
-	print('mass1*masssun as ', massA*masssun) #############
-	print('r1*rsun as ', rA*rsun) ###############
-	print('r2*rsun as ', rB*rsun) #################
-	print('semi as ', semitesting) ##############
-	print('periods as ', periods/daysecs) ###########
-		
 	#BELOW SECTION: Calculates transit values
 	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, numruns=numruns)
 	
@@ -285,7 +183,7 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 		graph.scatter(transitvals['T14'], transitvals['depthapprox'], s=4)
 		graph.show()
 		
-		graph.scatter(transitvals['T23'], transitvals['depthapprox'], s=4)
+		graph.scatter(transitvals['T14'], transitvals['depthapprox'], s=4)
 		graph.show()
 	
 	#Below returns the calculated values
@@ -334,32 +232,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		elif (r2[d] >= r1[d]):
 			rs[d] = r2[d]
 			rp[d] = r1[d]
-	
-	#BELOW SECTION: Trims values to fit specified number of runs
-	if (len(mass1) > numruns):
-		mass1 = mass1[0:numruns] #Primary mass
-	if (len(massp) > numruns):
-		massp = massp[0:numruns] #Orbiting mass
-	if (len(rs) > numruns):
-		rs = rs[0:numruns] #Primary radius
-	if (len(rp) > numruns):
-		rp = rp[0:numruns] #Orbiting radius
-	if (len(period) > numruns):
-		period = period[0:numruns] #Period
-	if (len(ecc) > numruns):
-		ecc = ecc[0:numruns] #Eccentricity
-	if (len(angle) > numruns):
-		angle = angle[0:numruns] #Inclination
-	if (len(imp) > numruns):
-		imp = imp[0:numruns] #Impact parameter
-	if (len(omega) > numruns):
-		omega = omega[0:numruns] #Omega
-	
-	if u1 is not None and u2 is not None: #Darkening parameters
-		if (len(u1) > numruns):
-			u1 = u1[0:numruns]
-		if (len(u2) > numruns):
-			u2 = u2[0:numruns]
+
 
 	#Below formulates some basic values
 	semi = calcsemimajor(period, (mass1+massp)) #Semimajor axis
@@ -373,13 +246,13 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	sqrt14 = np.sqrt((1 + (rp/rs))**2.0 - imp**2.0)
 	const14 = np.arcsin((rs*rsun/semi)*(sqrt14/np.sin(angle*pi/180.0)))
 	approx14 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
-	T14 = (period/pi)*const14*approx14
+	T14 = (period/daysecs/pi)*const14*approx14
 	
 	#For T23:
 	sqrt23 = np.sqrt((1 - (rp/rs))**2.0 - imp**2.0)
 	const23 = np.arcsin((rs*rsun/semi)*(sqrt23/np.sin(angle*pi/180.0)))
 	approx23 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
-	T23 = (period/pi)*const23*approx23
+	T23 = (period/daysecs/pi)*const23*approx23
 	
 	#Below calculates transit probability
 	prob = "You didn't specify omega.  Therefore the transit probability was not generated."
@@ -401,8 +274,73 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		denominatorex = 1.0 - (u1/3.0) - (u2/6.0)
 		depthexact = ((rp/rs)**2.0)*numeratorex/denominatorex
 	
+	
+	#BELOW SECTION: Trims out any 'nan' values
+	#Below sets up arrays to hold trimmed values
+	mass1done = np.zeros(numruns)
+	masspdone = np.zeros(numruns)
+	r1done = np.zeros(numruns)
+	r2done = np.zeros(numruns)
+	perioddone = np.zeros(numruns)
+	semidone = np.zeros(numruns)
+	eccdone = np.zeros(numruns)
+	angledone = np.zeros(numruns)
+	impdone = np.zeros(numruns)
+	omegadone = np.zeros(numruns)
+	u1done = np.zeros(numruns)
+	u2done = np.zeros(numruns)
+	T14done = np.zeros(numruns)
+	T23done = np.zeros(numruns)
+	probdone = np.zeros(numruns)
+	depthapprdone = np.zeros(numruns)
+	depthexactdone = np.zeros(numruns)
+	
+	#Below fills above arrays with non-'nan' values
+	track = 0 #Track place in trimmed arrays
+	placehere = 0 #Track place in original arrays
+	while track < numruns:
+		#Below skips current original values if 'nans' involved
+		if calc.isnan(T14[placehere]):
+			placehere = placehere + 1
+			
+			#Below throws an error if no more data to screen through
+			if placehere == len(mass1):
+				print('Oh no, too many nans for given amount of data!')
+				print('At a track of ', track)
+				raise ValueError('Oh no!  No more data to screen through.  Seems there were too many nans or too few data to start with.')
+			continue
+		
+		#Below adds non-'nan' values to trimmed arrays
+		mass1done[track] = mass1[placehere]
+		masspdone[track] = massp[placehere]
+		r1done[track] = r1[placehere]
+		r2done[track] = r2[placehere]
+		perioddone[track] = period[placehere]
+		semidone[track] = semi[placehere]
+		eccdone[track] = ecc[placehere]
+		angledone[track] = angle[placehere]
+		impdone[track] = imp[placehere]
+		omegadone[track] = omega[placehere]
+		u1done[track] = u1[placehere]
+		u2done[track] = u2[placehere]
+		T14done[track] = T14[placehere]
+		T23done[track] = T23[placehere]
+		probdone[track] = prob[placehere]
+		depthapprdone[track] = depthappr[placehere]
+		depthexactdone[track] = depthexact[placehere]
+		
+		#Below increments counts and tracking variables
+		track = track + 1
+		placehere = placehere + 1
+		
+	
+	######################
+	print('finished! with track as ', track, ' and placehere as ', placehere)
+	
+	######################
+	
 	#BELOW SECTION: Returns the calculated values
-	done = {'T14':T14, 'T23':T23, 'prob':prob, 'depthapprox':depthappr, 'depthexact':depthexact}
+	done = {'T14':T14done, 'T23':T23done, 'prob':probdone, 'depthapprox':depthapprdone, 'depthexact':depthexactdone, 'mass1':mass1done, 'mass2':masspdone, 'r1':r1done, 'r2':r2done, 'period':perioddone, 'semi':semidone, 'ecc':eccdone, 'angle':angledone, 'imp':impdone, 'omega':omegadone, 'u1':u1done, 'u2':u2done}
 
 	#Below returns generated values
 	return done
@@ -429,27 +367,23 @@ def calcsemimajor(period, massstar):
 
 ##FUNCTION: calcomega
 #Purpose: This function calculates omega based upon the given semimajor axis (semi), impact parameter (imp), eccentricity (ecc), primary radius (rs), and angle (angle).
-def calcomega(semi, imp, ecc, rs, angle):
+def calcomega(semi, imp, ecc, rs, angle, shift=False):
 	#Omega formula derived from Winn paper on Transits and Occultations
 	frac1 = (semi*np.cos(angle*pi/180.0)) * (1.0 - ecc**2.0) / (rs*imp*rsun)
-#	print('Calculating omega!') ##############
-#	print('frac1 part1 as ', (semi*np.cos(angle*pi/180.0))) ########
-#	print('frac1 as ', frac1) ############
-#	print('') #############
 	frac2 = (frac1 - 1.0) / ecc
-#	print('rs*rsun as ', rs*rsun) ###############
-#	print('')
-#	print('semi as ', semi) #################
-#	print('')
-#	print('frac2 as ', frac2) ####################
 	omega = np.arcsin(frac2)*180.0/pi
 	
-	#################
-#	print('')
-#	print('frac2 as ', frac2)
-#	print('')
-#	print('omega as ', omega) #####
-	#################
+	#BELOW SECTION: Phase shifts omega into 0 to 360 degree frame, if 'shift' passed in as 'True'
+	if shift == True:
+		#Below phase shifts omega into the 0 to 180 degree frame, if needed
+		import random as rand
+		if -180 < omega < 0:
+			omega = omega + 180
+		#Below next randomly assigns value to 0-t0-180 frame or 180-to-360 frame
+		randnum = rand.random()
+		if randnum >= 0.5:
+			omega = omega + 180
+		
 	#Below returns calculated omega
 	return omega
 ##
@@ -476,15 +410,18 @@ def calcimpactsemi(ecc, angle, rs, omega, imp):
 	part1 = (imp*rs*rsun) / np.cos(angle*pi/180.0)
 	part2 = (1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
 	
+	#Returns calculated impact-parameter-based semimajor axis
 	return (part1/part2)
 	
 
 ##FUNCTION: calcperiod
 #Purpose: Below as a method to calculate period based on Kepler's Third Law.
 def calcperiod(semi, massstar):
+	#Calculates period from Kepler's 3rd Law
 	part1 = 4*pi**2.0/(Gconst*massstar*masssun)
 	part2 = part1*semi**3.0
-		
+	
+	#Returns calculated period
 	return (abs(part2))**(1/2.0)
 	
 	
@@ -585,7 +522,7 @@ def makeecc(n, a, b):
 	
 
 ###TESTS
-##TEST: testcalctransit
+##TEST: testcalctransit; OUTDATED TEST
 #Purpose: This test is meant to test the calctransit function
 def testcalctransit(filename, numruns=100, **kwargs):
 	#Below calls an error if given file as nonexistent
@@ -644,14 +581,3 @@ def testcalctransit(filename, numruns=100, **kwargs):
 		testfile.write(str(np.sort(testT23)[g]) + '\n')
 	testfile.write('\n\n')	
 ##
-
-########################
-def rochelobe(q):
-    """returns r1/a; q = M1/M2"""
-    return 0.49*q**(2./3)/(0.6*q**(2./3) + np.log(1+q**(1./3)))
-
-def withinroche(semimajors,M1,R1,M2,R2):
-    q = M1/M2
-    return ((R1+R2)*rsun) > (rochelobe(q)*semimajors)
-
-	
