@@ -202,25 +202,47 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	#Below makes sure necessary parameters have been passed
 	if mass1 is None or massp is None or r1 is None or r2 is None or period is None or ecc is None or angle is None or imp is None:
 		raise ValueError('Please pass in all of the following parameters with correct values using cgs units (except for period, which should be given in days): mass1 (primary mass), massp (orbiting mass), r1 and r2 (primary and orbiting radius), period (the period), ecc (eccentricity), angle (given as i usually), and imp (impact parameter b).')
-	if numruns > len(mass1):
+	if isinstance(mass1, int):
+		if numruns != 1:
+			raise ValueError("It appears that the number of runs you specified is greater than the number of values (i.e, the number of mass1s) that you passed into the function.  Please specify a valid number of runs under the parameter 'numruns'.")
+
+	elif numruns > len(np.array(mass1)):
 		raise ValueError("It appears that the number of runs you specified is greater than the number of values (i.e, the number of mass1s) that you passed into the function.  Please specify a valid number of runs under the parameter 'numruns'.")
 
 	#BELOW SECTION: Calculates some constants for calculations
 	#Below converts everything to numpy arrays
-	mass1 = np.array(mass1)
-	massp = np.array(massp)
-	r1 = np.array(r1)
-	r2 = np.array(r2)
-	period = np.array(period)
-	ecc = np.array(ecc)
-	angle = np.array(angle)
-	imp = np.array(imp)
-	
-	if omega is not None:
-		omega = np.array(omega)
-	if u1 is not None and u2 is not None:
-		u1 = np.array(u1)
-		u2 = np.array(u2)
+	if not isinstance(mass1, int):
+		mass1 = np.array(mass1)
+		massp = np.array(massp)
+		r1 = np.array(r1)
+		r2 = np.array(r2)
+		period = np.array(period)
+		ecc = np.array(ecc)
+		angle = np.array(angle)
+		imp = np.array(imp)
+		
+		if omega is not None:
+			omega = np.array(omega)
+		if u1 is not None and u2 is not None:
+			u1 = np.array(u1)
+			u2 = np.array(u2)
+			
+	else: #If singular values passed in
+		mass1 = np.array([mass1])
+		massp = np.array([massp])
+		r1 = np.array([r1])
+		r2 = np.array([r2])
+		period = np.array([period])
+		ecc = np.array([ecc])
+		angle = np.array([angle])
+		imp = np.array([imp])
+		
+		if omega is not None:
+			omega = np.array([omega])
+		if u1 is not None and u2 is not None:
+			u1 = np.array([u1])
+			u2 = np.array([u2])
+
 	
 	#Below sets larger and smaller radii
 	rs = np.zeros(len(mass1))
@@ -242,17 +264,17 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	#Note: Formulas from Winn paper on Transits and Occultations
 	#Below calculates transit times
 
-	#For T14:
+	#For T14: in seconds
 	sqrt14 = np.sqrt((1 + (rp/rs))**2.0 - imp**2.0)
 	const14 = np.arcsin((rs*rsun/semi)*(sqrt14/np.sin(angle*pi/180.0)))
 	approx14 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
-	T14 = (period/daysecs/pi)*const14*approx14
+	T14 = (period/pi)*const14*approx14
 	
-	#For T23:
+	#For T23: in days
 	sqrt23 = np.sqrt((1 - (rp/rs))**2.0 - imp**2.0)
 	const23 = np.arcsin((rs*rsun/semi)*(sqrt23/np.sin(angle*pi/180.0)))
 	approx23 = np.sqrt(1 - ecc**2.0) / (1 + ecc*np.sin(omega*pi/180.0))
-	T23 = (period/daysecs/pi)*const23*approx23
+	T23 = (period/pi)*const23*approx23
 	
 	#Below calculates transit probability
 	prob = "You didn't specify omega.  Therefore the transit probability was not generated."
@@ -469,6 +491,9 @@ def makeangle(n):
 	randdist = np.zeros(n)
 	for c in range(0, n):
 		randdist[c] = rand.random() * endrange
+	
+	
+	randdist = np.ones(n)*45 ###################
 	
 	#Below generates uniform angle results
 	return randdist
