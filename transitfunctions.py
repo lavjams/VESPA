@@ -10,31 +10,32 @@ import numpy as np
 import math as calc
 import matplotlib.pyplot as graph
 import astropy.constants as const
+#Below imports necessary functions from elsewhere
+from starutils.populations import BGStarPopulation_TRILEGAL
+from starutils.populations import MultipleStarPopulation
+from starutils.populations import DARTMOUTH
+bandlist = ['g', 'r', 'i', 'z', 'J', 'H', 'K', 'Kepler']
 
 #Below imports necessary constants
 #Below are some constant values
 daysecs = 86400.0 #Number of seconds in a day
+yearsecs = daysecs*365.256 #Number of seconds in a year
+yeardays = 365.256 #Number of days in a year
 masssun = const.M_sun.cgs.value #Mass of Sun in grams
 massearth = const.M_earth.cgs.value #Mass of Earth in grams
 Gconst = const.G.cgs.value #Gravitational constant, cgs
 rsun = const.R_sun.cgs.value #Radius of Sun, cgs
+rearth = const.R_earth.cgs.value #Radius of Earth, cgs
 eccearth = 0.01671123 #Eccentricty of Earth's orbit; ###FIND EXACT VALUE!
 au = const.au.cgs.value #Astronomical unit, cgs
 pi = np.pi #Value of pi
 
 
-##FUNCTION: gensim ###NOT TESTED
+##FUNCTION: gensim
 #Purpose: This function is meant to run a star simulation to generate a population of stars and statistics
 #NOTE: Sections of code heavily (very heavily) adapted from Tim Morton's vespa.populations code; thanks!
 #Dependencies: starutils.populations.BGStarPopulation_TRILEGAL
-def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=None, MAfn=None, mags=None, maxrad=10, f_binary=0.4, **kwargs):
-	#Below imports necessary functions from elsewhere
-	from starutils.populations import BGStarPopulation_TRILEGAL
-	from starutils.populations import MultipleStarPopulation
-	if ichrone is None:
-		from starutils.populations import DARTMOUTH
-		ichrone = DARTMOUTH
-		
+def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=DARTMOUTH, MAfn=None, mags=None, maxrad=10, f_binary=0.4, **kwargs):
 	##
 	#BELOW SECTION: Borrowed code from Tim Morton
 	bgpop = BGStarPopulation_TRILEGAL(trilegal_filename, ra=ra, dec=dec, mags=mags, maxrad=maxrad, n=n, **kwargs)
@@ -67,38 +68,207 @@ def gensim(trilegal_filename, ra=None, dec=None, n=2e4, ichrone=None, MAfn=None,
 ##
 
 
+#####
+#BELOW SECTION: Opens up the star distribution and records necessary values
+#Below generates a sample population
+filename = 'samplepop.h5'
+pop = gensim(filename)
+#####
+
+
+
+##FUNCTION: genstarpop
+#Purpose: This function is meant to generate a population of stars from passed in population of stars; will randomize the values by shuffling the given arrays
+def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, band='Kepler', plot=True, savename='exrunstar', **kwargs):
+	#BELOW SECTION: Puts together the magnitudes
+	if band not in bandlist:
+		raise ValueError("Oh no!  Looks like you passed an invalid band.  Please pass one of the these bands:\n" + str(bandlist) + "\n(Note that the default is 'Kepler'.)")
+	elif band in bandlist:
+		magkeyword = str(band) + '_mag'
+		magraw = population.stars[magkeyword]
+	
+	#Below are star parameters, unshuffled
+	rAraw = population.stars.radius_A
+	rBraw = population.stars.radius_B
+	massAraw = population.stars.mass_A
+	massBraw = population.stars.mass_B
+	uAraw = population.stars.Teff_A
+	uBraw = population.stars.logg_A
+	
+	
+	#BELOW SECTION: Shuffles the orbital parameters
+	#Below generates arrays to hold shuffled values
+	length = len(rAraw)
+	rAshuffle = np.zeros(length)
+	rBshuffle = np.zeros(length)
+	massAshuffle = np.zeros(length)
+	massBshuffle = np.zeros(length)
+	uAshuffle = np.zeros(length)
+	uBshuffle = np.zeros(length)
+	magshuffle = np.zeros(length)
+	
+	#Below shuffles the indices of the arrays
+	shuffledinds = np.arange(length)
+	np.random.shuffle(shuffledinds) #Shuffles the indices
+	
+	#Below fills the new arrays with shuffled values
+	for h in range(0, length):
+		rAshuffle[h] = rAraw[shuffledinds[h]]
+		rBshuffle[h] = rBraw[shuffledinds[h]]
+		massAshuffle[h] = massAraw[shuffledinds[h]]
+		massBshuffle[h] = massBraw[shuffledinds[h]]
+		uAshuffle[h] = uAraw[shuffledinds[h]]
+		uBshuffle[h] = uBraw[shuffledinds[h]]
+		magshuffle[h] = magraw[shuffledinds[h]]
+	
+	
+	#BELOW SECTION: Runs model on the shuffled values
+	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band=band, plot=plot, savename=savename, poptype='Stars')
+	return model
+	
+##
+
+
+##FUNCTION: genplanetpop
+#Purpose: This function is meant to generate a population of planets based upon read-in primary star values
+def genplanetpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=True, radiusbinsize=0.3, savename='exrunplanet', band='Kepler', **kwargs):	
+	#BELOW SECTION: Puts together the magnitudes
+	if band not in bandlist:
+		raise ValueError("Oh no!  Looks like you passed an invalid band.  Please pass one of the these bands:\n" + str(bandlist) + "\n(Note that the default is 'Kepler'.)")
+	elif band in bandlist:
+		magkeyword = str(band) + '_mag'
+		magraw = population.stars[magkeyword]
+
+	#Below are star parameters, unshuffled
+	rAraw = population.stars.radius_A
+	massAraw = population.stars.mass_A
+	uAraw = population.stars.Teff_A
+	uBraw = population.stars.logg_A
+	
+	#BELOW SECTION: Shuffles the given orbital parameters
+	#Below generates arrays to hold shuffled values
+	length = len(rAraw)
+	rAshuffle = np.zeros(length)
+	massAshuffle = np.zeros(length)
+	uAshuffle = np.zeros(length)
+	uBshuffle = np.zeros(length)
+	magshuffle = np.zeros(length)
+	
+	#Below shuffles the indices of the arrays
+	shuffledinds = np.arange(length)
+	np.random.shuffle(shuffledinds) #Shuffles the indices
+	
+	#Below fills the new arrays with shuffled values
+	for i in range(0, length):
+		rAshuffle[i] = rAraw[shuffledinds[i]]
+		massAshuffle[i] = massAraw[shuffledinds[i]]
+		uAshuffle[i] = uAraw[shuffledinds[i]]
+		uBshuffle[i] = uBraw[shuffledinds[i]]
+		magshuffle[i] = magraw[shuffledinds[i]]
+	
+	
+	#BELOW SECTION: generates random planetary radii and masses, based upon ratio of Earth's radius to Sun's radius
+	#NOTE: Mostly follows the procedures for generating planetary populations as given in T. Morton's 'PlanetPopulation' code
+	#Below generates radius bin from which to uniformly draw radii
+	baseratio = (rearth/(rsun*1.0))*np.mean(np.ma.masked_array(rAshuffle, np.isnan(rAshuffle))) #Excludes nans
+	radiusbinmax = baseratio*(1 + radiusbinsize) #Max radius in bin
+	radiusbinmin = baseratio*(1 - radiusbinsize) #Min radius in bin
+	
+	#Below pulls radii randomly from given bin
+	rBshuffle = (np.random.random(length))*(radiusbinmax - radiusbinmin) + radiusbinmin
+	#Below next generates masses based upon radii; same formula as used by T. Morton's planetary mass generation
+	massBshuffle = ((rBshuffle*rsun/(1.0*rearth))**2.06) * (massearth/(1.0*masssun))
+
+	
+	#BELOW SECTION: Runs model on the shuffled values
+	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band='Kepler', poptype='Planets', plot=plot, savename=savename)
+	return model
+##
+
+
+##FUNCTION: comparepop
+#Purpose: This function is meant to generate both a star population and a planet population.  It will compare the generated results through plots and such.
+def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=True, radiusbinsize=0.3, savenameroot='exrun', band='Kepler', **kwargs):
+	#BELOW SECTION: Generates results for star and planet populations
+	starpop = genstarpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=plot)
+	planetpop = genplanetpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'planet'), band=band, plot=plot)
+	savename = savenameroot #For recording graphs
+	
+	
+	#BELOW SECTION: Plots overlying values of populations
+		#Scatter: Period vs. T14, both in days
+	graph.scatter(starpop['period']/yearsecs, starpop['T14']/daysecs, s=4, alpha=.35, color='blue', label='Stars')
+	graph.scatter(planetpop['period']/yearsecs, planetpop['T14']/daysecs, s=4, alpha=.35, color='orange', label='Planets')
+	graph.title('Periods vs. T14: ' + str(starpop['numruns']) + ' Points')
+	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
+	graph.xlabel('Periods in Years')
+	graph.ylabel('T14 in Days')
+	graph.legend(loc='best')
+	graph.savefig(savename+'PervsT14Both.png')
+	graph.close()
+
+
+	#Scatter: T14 (in days) vs. log10(Exact Depth)
+	graph.scatter(starpop['T14']/daysecs, np.log10(starpop['depthexact']),s=4, alpha=.35, color='purple', label='Stars')
+	graph.scatter(planetpop['T14']/daysecs, np.log10(planetpop['depthexact']),s=4, alpha=.35, color='red', label='Planets')
+	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
+	graph.title('T14 (in Days) vs. Log10(Depth, Exact): ' + str(starpop['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('Log10(Depth, Exact)')
+	graph.legend(loc='best')
+	graph.savefig(savename+'T14vsLog10DepthExactBoth.png')
+	graph.close()
+	
+	
+	#Scatter: T14 (in days) vs. T14/tau
+	graph.scatter(starpop['T14']/daysecs, (starpop['T14'])/(starpop['tau']),s=4, alpha=.35, color='blue', label='Stars')
+	graph.scatter(planetpop['T14']/daysecs, (planetpop['T14'])/(planetpop['tau']),s=4, alpha=.35, color='orange', label='Planets')
+	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
+	graph.title('T14 (in Days) vs. T14/tau Ratio: ' + str(starpop['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('T14/tau Ratio')
+	graph.legend(loc='best')
+	graph.savefig(savename+'T14vsT14-tauRatioBoth.png')
+	graph.close()
+	
+	
+	#Scatter: Log10(Depth, Exact) vs. T14/tau
+	graph.scatter(np.log10(starpop['depthexact']), (starpop['T14'])/(starpop['tau']),s=4, alpha=.35, color='purple', label='Stars')
+	graph.scatter(np.log10(planetpop['depthexact']), (planetpop['T14'])/(planetpop['tau']),s=4, alpha=.35, color='red', label='Planets')
+	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
+	graph.title('Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(starpop['numruns']) + ' Points')
+	graph.xlabel('Log10(Depth, Exact)')
+	graph.ylabel('T14/tau Ratio')
+	graph.legend(loc='best')
+	graph.savefig(savename+'Log10DepthExactvsT14-tauRatioBoth.png')
+	graph.close()
+##
+
+
+
 ##FUNCTION: runmodel
-#Purpose: This function is meant to run a star simulation to generate a population of stars and statistics, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
+#Purpose: This function is meant to run a simulation to generate a population of statistics based upon passed in radii, masses, and (if needed) darkening parameters, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
 #Numruns indicates the number of stars.
 #Dependencies:
-def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, plot=False, **kwargs):
-	#Below specifies three times as much data to be used
+def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, ecca=2, eccb=2, numruns=9000, poptype=None, plot=True, savename='exrun', band='Kepler', **kwargs):
+	#Note: totalruns specifies more than enough data to be used
 	#This allows room to screen out 'nan' values later in calctransit
-	totalruns = numruns*5
+	totalruns = calc.ceil(numruns*1.01)
 	
-	#BELOW SECTION: Opens up the star distribution and records necessary values
-	pop = gensim(filename)
-	#Below are star parameters
-	rAraw = pop.stars.radius_A
-	rBraw = pop.stars.radius_B
-	massAraw = pop.stars.mass_A
-	massBraw = pop.stars.mass_B
-	uAraw = pop.stars.Teff_A
-	uBraw = pop.stars.Teff_B
-
 	#BELOW SECTION: Generates random parameter distributions
 	eccs = makeecc(totalruns, ecca, eccb) #Beta distribution
-	angles = makeangle(totalruns)
+	omegas = makeangle(totalruns)
 	impsraw = makeimp(rAraw, rBraw)
 	
 	#Below calculates omegas; throws out any invalid omega values
-	omegas = np.zeros(totalruns)
+	angles = np.zeros(totalruns)
 	rA = np.zeros(totalruns)
 	rB = np.zeros(totalruns)
 	massA = np.zeros(totalruns)
 	massB = np.zeros(totalruns)
 	uA = np.zeros(totalruns)
 	uB = np.zeros(totalruns)
+	mag = np.zeros(totalruns)
 	periods = np.zeros(totalruns)
 	imps = np.zeros(totalruns)
 	semitesting = np.zeros(totalruns) #For TESTING purposes
@@ -130,27 +300,41 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 			rnothere = rAraw[totalplace]
 		
 		
-		#BELOW determines range of allowed period values
-		#Allowed semi values
-		highestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=90.0)
-		lowestsemi = calcimpactsemi(imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], omega=270.0)
-		#Derived period values
-		highestperiod = calcperiod(semi=highestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
-		lowestperiod = calcperiod(semi=lowestsemi, massstar=(massAraw[totalplace]+massBraw[totalplace]))
+		#Below generates period and semi here
+		periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False) #Period between about 4 and 20 years
+		semihere = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
 		
-		#Below generates period here
-		periodhere = makeperiod(1, periodp, rangestart=lowestperiod, rangeend=highestperiod)
+		#Below ensures period as within the roche limit
+		while withinroche(semihere, mass1=massAraw[totalplace], mass2=massBraw[totalplace], r1=rhere, r2=rnothere):
+			#Below generates new periods and semis until valid distance
+			periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False) #Period between about 4 and 20 years
+			semihere = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
+			
+			#Below increments count of tries
+			tryhere = tryhere + 1
+			#Skips ahead if too many tries
+			if tryhere >= 1000:
+				print('No periods within roche range, apparently.')
+				#print('tryhere reached ', tryhere)
+				#print('totalplace reached ', totalplace)
+				#print('Current track as ', track)
+				print('So, skipping this data point at totalplace ', totalplace)
+				print('')
+				totalplace = totalplace + 1
+				tryhere = 0
+				break
+				#raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
+				
 
-		#Below computes omega with current values
-		semi = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
-		if highestsemi < 0: #Temp fix for sign issues of semi
-			semi = semi*(-1)
-		
-		omegahere = calcomega(semi=semi, imp=impsraw[totalplace], angle=angles[track], rs=rhere, ecc=eccs[track], shift=True)
 
-		#Below keeps data if valid omega parameter was produced; throws out otherwise
-		if not calc.isnan(omegahere):
-			omegas[track] = omegahere
+		#Below computes semi and angle with current values
+		semi = semihere
+		#anglehere = calcminangle(period=periodhere, mass1=massAraw[totalplace], mass2=massBraw[totalplace], r1=rhere, r2=rnothere)
+		anglehere = calcangle(period=periodhere, r1=rhere, semi=semihere, omega=omegas[track], imp=impsraw[totalplace], ecc=eccs[track])
+
+		#Below keeps data if valid angle parameter was produced; throws out otherwise
+		if not calc.isnan(anglehere):
+			angles[track] = anglehere
 			semitesting[track] = semi
 			imps[track] = impsraw[totalplace]
 			rA[track] = rAraw[totalplace]
@@ -160,34 +344,182 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 			uA[track] = uAraw[totalplace]
 			uB[track] = uBraw[totalplace]
 			periods[track] = periodhere
+			mag[track] = magraw[totalplace]
 			
 			#Below increments counts
 			track = track + 1
 			totalplace = totalplace + 1
 			tryhere = 0
 
-		else: #If too many tries used, terminates
+		else: #If too many tries used, skips to next data
 			tryhere = tryhere + 1
-			if tryhere >= 1:
-				print('tryhere reached ', tryhere)
-				print('totalplace reached ', totalplace)
-				print('Current track as ', track)
-				raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
+			if tryhere >= 1000:
+				print('tryhere reached ', tryhere, ' at totalplace of ', totalplace)
+				#print('totalplace reached ', totalplace)
+				#print('Current track as ', track)
+				print('So, skipping this data point.')
+				print('')
+				totalplace = totalplace + 1
+				#raise ValueError("Oh no!  Used too many tries for generating a valid period at this point.")
 
-
+		
+				
 	#BELOW SECTION: Calculates transit values
-	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, numruns=numruns)
+	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, mag=mag, numruns=numruns, ecca=ecca, eccb=eccb, band=band, periodp=periodp, poptype=poptype)
 	
 	#BELOW SECTION: Graphs transit values if passed-in parameter 'plot' set as 'True'
 	if plot == True:
-		graph.scatter(transitvals['T14'], transitvals['depthapprox'], s=4)
-		graph.show()
-		
-		graph.scatter(transitvals['T14'], transitvals['depthapprox'], s=4)
-		graph.show()
+		plotmodel(transitvals, savename=savename)
 	
 	#Below returns the calculated values
 	return transitvals
+##
+
+
+##FUNCTION: plotmodel
+#Purpose: This function is meant to run several plots, given a dictionary of transit values
+#Dependencies:
+def plotmodel(transitdict, savename='exrun'):
+	#BELOW SECTION: General plots of parameters
+	
+	#Hist: Periods
+	graph.hist(transitdict['period']/yearsecs, alpha = .35, color='green')
+	graph.title(str(transitdict['poptype']) + ': Period Distribution: ' + str(transitdict['numruns']) + ' Points')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.xlabel('Distribution (in Years)')
+	graph.ylabel('Counts')
+	graph.savefig(savename+'PerHist.png')
+	graph.close()
+
+	
+	#Hist: Eccentricities
+	graph.hist(transitdict['ecc'], alpha = .35, color='orange')
+	graph.title(str(transitdict['poptype']) + ': Eccentricity Distribution: ' + str(transitdict['numruns']) + ' Points')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.xlabel('Distribution')
+	graph.ylabel('Counts')
+	graph.savefig(savename+'EccHist.png')
+	graph.close()
+
+	
+	#Scatter: Prob vs. T14 (in days)
+	graph.scatter(transitdict['prob'], transitdict['T14']/daysecs, s=4, alpha=.35, color='brown')
+	graph.title(str(transitdict['poptype']) + ': Transit Probability vs. T14: ' + str(transitdict['numruns']) + ' Points')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.xlabel('Transit Probability')
+	graph.ylabel('T14 in Days')
+	graph.savefig(savename+'ProbvsT14.png')
+	graph.close()
+
+
+	#Scatter: Period vs. T14, both in days
+	graph.scatter(transitdict['period']/yearsecs, transitdict['T14']/daysecs, s=4, alpha=.35, color='green')
+	graph.title(str(transitdict['poptype']) + ': Periods vs. T14: ' + str(transitdict['numruns']) + ' Points')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.xlabel('Periods in Years')
+	graph.ylabel('T14 in Days')
+	graph.savefig(savename+'PervsT14.png')
+	graph.close()
+
+
+	#Scatter: T14 (in days) vs. Exact Depth
+	graph.scatter(transitdict['T14']/daysecs, transitdict['depthexact'], s=4, alpha=.35, color='blue')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Depth, Exact: ' + str(transitdict['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('Depth, Exact')
+	graph.savefig(savename+'T14vsDepthExact.png')
+	graph.close()
+	
+	
+	
+	#BELOW SECTION: Plots based in form upon background research papers (specifically, on the 'Exoplanet Transit Validations...' Paper
+	
+	#Scatter: T14 (in days) vs. log10(Exact Depth)
+	graph.scatter(transitdict['T14']/daysecs, np.log10(transitdict['depthexact']), s=4, alpha=.35, color='blue')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact): ' + str(transitdict['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('Log10(Depth, Exact)')
+	graph.savefig(savename+'T14vsLog10DepthExact.png')
+	graph.close()
+	
+	
+	#Scatter: T14 (in days) vs. T14/tau
+	graph.scatter(transitdict['T14']/daysecs, (transitdict['T14'])/(transitdict['tau']), s=4, alpha=.35, color='blue')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. T14/tau Ratio: ' + str(transitdict['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('T14/tau Ratio')
+	graph.savefig(savename+'T14vsT14-tauRatio.png')
+	graph.close()
+	
+	
+	#Scatter: Log10(Depth, Exact) vs. T14/tau
+	graph.scatter(np.log10(transitdict['depthexact']), (transitdict['T14'])/(transitdict['tau']), s=4, alpha=.35, color='purple')
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.title(str(transitdict['poptype']) + ': Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(transitdict['numruns']) + ' Points')
+	graph.xlabel('Log10(Depth, Exact)')
+	graph.ylabel('T14/tau Ratio')
+	graph.savefig(savename+'Log10DepthExactvsT14-tauRatio.png')
+	graph.close()
+	
+	
+	
+	#BELOW SECTION: More developed plots
+	
+	#Scatter: T14 (in days) vs. Log10(Exact Depth); Periods colored by bin
+	#Below colors each dot depending on the period
+	t14days = transitdict['T14']/daysecs #T14 in days
+	dexactlog10 = np.log10(transitdict['depthexact']) #Log10 of depth exact
+	perdays = transitdict['period']/daysecs #Periods in days
+	maxperrounded = max(perdays) #Maximum period for this run
+	minperrounded = min(perdays) #Minimum period for this run
+	print('Note: maxperrounded as ', maxperrounded) #####
+	numspace = 5.0 #Number of intervals
+	spacing = (maxperrounded-minperrounded) / numspace #Space within bins
+	t14dayslists = [[] for _ in range(5)]
+	dexactlog10lists = [[] for _ in range(5)]
+	
+	for a in range(0, len(t14days)):
+		if minperrounded < perdays[a] and perdays[a] <= minperrounded + spacing:
+			t14dayslists[0].append(t14days[a])
+			dexactlog10lists[0].append(dexactlog10[a])
+
+		elif minperrounded + spacing < perdays[a] and perdays[a] <= minperrounded + spacing*2.0:
+			t14dayslists[1].append(t14days[a])
+			dexactlog10lists[1].append(dexactlog10[a])
+
+		elif minperrounded + spacing*2.0 < perdays[a] and perdays[a] <= minperrounded + spacing*3.0:
+			t14dayslists[2].append(t14days[a])
+			dexactlog10lists[2].append(dexactlog10[a])
+
+		elif minperrounded + spacing*3.0 < perdays[a] and perdays[a] <= minperrounded + spacing*4.0:
+			t14dayslists[3].append(t14days[a])
+			dexactlog10lists[3].append(dexactlog10[a])
+
+		elif minperrounded + spacing*4.0 < perdays[a] and perdays[a] <= maxperrounded:
+			t14dayslists[4].append(t14days[a])
+			dexactlog10lists[4].append(dexactlog10[a])
+	
+	spacingyears = round((spacing / yeardays), 2)
+	minperyearrounded = round(minperrounded/yeardays, 2)
+	maxperyearrounded = round(maxperrounded/yeardays, 2)
+	
+	graph.scatter(t14dayslists[0], dexactlog10lists[0], s=4, alpha=.35, color='cyan', label=(str(minperyearrounded) + '-' + str(minperyearrounded+spacingyears) + ' Years'))
+	graph.scatter(t14dayslists[1], dexactlog10lists[1], s=4, alpha=.35, color='blue', label=(str(minperyearrounded+spacingyears) + '-' + str(minperyearrounded+spacingyears*2) + ' Years'))
+	graph.scatter(t14dayslists[2], dexactlog10lists[2], s=4, alpha=.35, color='green', label=(str(minperyearrounded+spacingyears*2) + '-' + str(minperyearrounded+spacingyears*3) + ' Years'))
+	graph.scatter(t14dayslists[3], dexactlog10lists[3], s=4, alpha=.35, color='purple', label=(str(minperyearrounded+spacingyears*3) + '-' + str(minperyearrounded+spacingyears*4) + ' Years'))
+	graph.scatter(t14dayslists[4], dexactlog10lists[4], s=4, alpha=.35, color='black', label=(str(minperyearrounded+spacingyears*4) + '-' + str(maxperyearrounded) + ' Years'))
+				
+	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
+	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact), with Colored Periods: ' + str(transitdict['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('Log10(Depth, Exact)')
+	graph.legend(loc='best')
+	graph.savefig(savename+'T14vsLog10DepthExactwithPerColors.png')
+	graph.close()
+	
 ##
 
 
@@ -198,10 +530,10 @@ def runmodel(filename='samplepop.h5', periodp=2, ecca=2, eccb=2, numruns=100, pl
 #Purpose: This function is meant to accept several inputs in cgs units (except for period, which should be given in days), including primary and orbiting masses (mass1 and massp), primary and orbiting radii (r1 and r2), a period (period), eccentricity (ecc), omega (omega), angle (angle), impact parameter (imp), and limb darkening (u1 and u2).
 #It calculates analytically several aspects of the transit curve, including full width (T14), mid width (T23), transit probability (prob), exact depth (depthexact), and approximate depth (depthappr).
 #Dependencies: calcsemimajor
-def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, numruns=100, **kwargs):
+def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, mag=None, numruns=100, ecca=None, eccb=None, periodp=None, band='Kepler', poptype=None, **kwargs):
 	#Below makes sure necessary parameters have been passed
-	if mass1 is None or massp is None or r1 is None or r2 is None or period is None or ecc is None or angle is None or imp is None:
-		raise ValueError('Please pass in all of the following parameters with correct values using cgs units (except for period, which should be given in days): mass1 (primary mass), massp (orbiting mass), r1 and r2 (primary and orbiting radius), period (the period), ecc (eccentricity), angle (given as i usually), and imp (impact parameter b).')
+	if mass1 is None or massp is None or r1 is None or r2 is None or period is None or ecc is None or angle is None or imp is None or omega is None:
+		raise ValueError('Please pass in all of the following parameters with correct values using cgs units: mass1 (primary mass), massp (orbiting mass), r1 and r2 (primary and orbiting radius), period, ecc (eccentricity), angle (given as i usually), omega, and imp (impact parameter b).')
 	if isinstance(mass1, int):
 		if numruns != 1:
 			raise ValueError("It appears that the number of runs you specified is greater than the number of values (i.e, the number of mass1s) that you passed into the function.  Please specify a valid number of runs under the parameter 'numruns'.")
@@ -297,7 +629,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		depthexact = ((rp/rs)**2.0)*numeratorex/denominatorex
 	
 	
-	#BELOW SECTION: Trims out any 'nan' values
+	#BELOW SECTION: Trims out any 'nan' values or invalid probs
 	#Below sets up arrays to hold trimmed values
 	mass1done = np.zeros(numruns)
 	masspdone = np.zeros(numruns)
@@ -313,16 +645,22 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	u2done = np.zeros(numruns)
 	T14done = np.zeros(numruns)
 	T23done = np.zeros(numruns)
+	taudone = np.zeros(numruns)
 	probdone = np.zeros(numruns)
 	depthapprdone = np.zeros(numruns)
 	depthexactdone = np.zeros(numruns)
+	magdone = np.zeros(numruns)
 	
 	#Below fills above arrays with non-'nan' values
 	track = 0 #Track place in trimmed arrays
 	placehere = 0 #Track place in original arrays
 	while track < numruns:
 		#Below skips current original values if 'nans' involved
-		if calc.isnan(T14[placehere]):
+		if calc.isnan(T14[placehere]) or prob[placehere] > 1.0:
+			if prob[placehere] > 1.0:
+				print('A probability greater than 1 was calculated...')
+				print('Found at index ', placehere, '. It was discarded.')
+				print('')
 			placehere = placehere + 1
 			
 			#Below throws an error if no more data to screen through
@@ -350,6 +688,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		probdone[track] = prob[placehere]
 		depthapprdone[track] = depthappr[placehere]
 		depthexactdone[track] = depthexact[placehere]
+		magdone[track] = mag[placehere]
 		
 		#Below increments counts and tracking variables
 		track = track + 1
@@ -361,8 +700,17 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	
 	######################
 	
+	#BELOW SECTION: Nan formatting for T23; also constructs tau array
+	#Below replaces the nans within T23 with values of zero
+	nanplaces = np.isnan(T23done)
+	T23done[nanplaces] = 0.0
+	
+	#Below fills in tau array; tau = (T14-T23)/2
+	taudone = (T14done - T23done)/2.0	
+	
+	
 	#BELOW SECTION: Returns the calculated values
-	done = {'T14':T14done, 'T23':T23done, 'prob':probdone, 'depthapprox':depthapprdone, 'depthexact':depthexactdone, 'mass1':mass1done, 'mass2':masspdone, 'r1':r1done, 'r2':r2done, 'period':perioddone, 'semi':semidone, 'ecc':eccdone, 'angle':angledone, 'imp':impdone, 'omega':omegadone, 'u1':u1done, 'u2':u2done}
+	done = {'T14':T14done, 'T23':T23done, 'tau':taudone, 'prob':probdone, 'depthapprox':depthapprdone, 'depthexact':depthexactdone, 'mass1':mass1done, 'mass2':masspdone, 'r1':r1done, 'r2':r2done, 'period':perioddone, 'semi':semidone, 'ecc':eccdone, 'angle':angledone, 'imp':impdone, 'omega':omegadone, 'u1':u1done, 'u2':u2done, 'ecca':ecca, 'eccb':eccb, 'periodp':periodp, 'numruns':numruns, 'mag':mag, 'band':band, 'poptype':poptype}
 
 	#Below returns generated values
 	return done
@@ -372,15 +720,12 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 ##FUNCTION: calcsemimajor
 #Purpose: This function calculates the semimajor axis (in centimeters) using a given star mass (in grams) and period (in days)
 def calcsemimajor(period, massstar):
-	#Below converts the period from days to seconds
-	periodsecs = period#*daysecs
-	
 	#Semimajor axis formula, by Kepler's Law:
 	#T^2/a^3 = (4*pi^2 / (G*Mstar))
 	
 	#Below calculates the semimajor axis
 	const = (Gconst*massstar*masssun)/(4.0*pi**2.0)
-	semimajoraxis = (const*periodsecs**2.0)**(1.0/3.0)
+	semimajoraxis = (const*period**2.0)**(1.0/3.0)
 
 	#Below returns calculated value
 	return semimajoraxis #In centimeters
@@ -408,6 +753,32 @@ def calcomega(semi, imp, ecc, rs, angle, shift=False):
 		
 	#Below returns calculated omega
 	return omega
+##
+
+
+##FUNCTION: calcangle
+#Purpose: This function calculates the angle i for a given orbit using already determined parameters
+def calcangle(period, semi, r1, omega, imp, ecc):
+	#Below calculates angle from impact parameter formula given in Winn paper
+	val1 = (imp*rsun*r1)/semi
+	val2 = (1 + ecc*np.sin(omega))/(1.0 - ecc**2.0)
+	anglehere = np.arccos(val1*val2)
+	
+	#Below returns calculated angle
+	return anglehere
+##
+
+
+##FUNCTION: calcminangle
+#Purpose: This function calculates the minimum allowed angle i for a given orbit
+def calcminangle(period, mass1, mass2, r1, r2):
+	#Below calculates minimum allowed angle i
+	semi = calcsemimajor(period, (mass1+mass2))
+	val = ((r1+r2)*rsun) / semi
+	minangle = np.arccos(val)*180.0/pi
+	
+	#Below returns calculated angle
+	return minangle
 ##
 
 
@@ -492,17 +863,15 @@ def makeangle(n):
 	for c in range(0, n):
 		randdist[c] = rand.random() * endrange
 	
-	
-	randdist = np.ones(n)*45 ###################
-	
 	#Below generates uniform angle results
 	return randdist
 ##
 
 	
 ##FUNCTION: makeperiod
-#Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p
-def makeperiod(n, p, rangestart=None, rangeend=None):
+#Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p; rangestart and rangeend should be passed through in days
+#Notes: If dayunits passed as False, will work in units of seconds
+def makeperiod(n, p, rangestart=None, rangeend=None, dayunits=True):
 	#Below imports basic packages
 	import random as rand
 	n = int(n)
@@ -516,17 +885,22 @@ def makeperiod(n, p, rangestart=None, rangeend=None):
 			randnum[a] = rand.random() * endrange
 	
 		#Below generates the power law results
-		perdone = randnum**p
-		return perdone
+		if dayunits is True: #In units of days
+			perdone = (randnum**p)
+			return perdone
+		
+		elif dayunits is False: #In units of seconds
+			perdone = (randnum**p)*daysecs
+			return perdone
 		
 	#If range is given, then samples from between endrange
 	elif rangestart is not None and rangeend is not None:
 		randinrange = np.zeros(n) #To hold random numbers
 		for b in range(0, n):
-			randinrange[b] = rand.uniform(rangestart**(1.0/p), rangeend**(1.0/p))
+			randinrange[b] = rand.uniform((rangestart*daysecs)**(1.0/p), (rangeend*daysecs)**(1.0/p))
 			
 		#Below generates the power law results
-		perdone = randinrange**p
+		perdone = (randinrange**p)
 		return perdone
 ##
 
@@ -546,6 +920,25 @@ def makeecc(n, a, b):
 	
 	
 
+###UTILITIES
+##UTILITY: rochelobe; borrowed from T. Morton's work; thanks!
+def rochelobe(q):
+    return 0.49*q**(2./3)/(0.6*q**(2./3) + np.log(1+q**(1./3)))
+## #End of borrowed code
+
+
+##UTILITY: Checks if values within roche limit
+def withinroche(semi, mass1, mass2, r1, r2):
+	ratio = mass1/(mass2*1.0)
+	bool = ((r1 + r2)*rsun) > (rochelobe(ratio)*semi)
+
+	return bool
+##
+
+	
+
+	
+##########################
 ###TESTS
 ##TEST: testcalctransit; OUTDATED TEST
 #Purpose: This test is meant to test the calctransit function
