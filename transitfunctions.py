@@ -9,6 +9,7 @@
 import numpy as np
 import math as calc
 import matplotlib.pyplot as graph
+import matplotlib.cm as cm
 import astropy.constants as const
 #Below imports necessary functions from elsewhere
 from starutils.populations import BGStarPopulation_TRILEGAL
@@ -79,7 +80,7 @@ pop = gensim(filename)
 
 ##FUNCTION: genstarpop
 #Purpose: This function is meant to generate a population of stars from passed in population of stars; will randomize the values by shuffling the given arrays
-def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, band='Kepler', plot=True, savename='exrunstar', **kwargs):
+def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), band='Kepler', plot=True, savename='exrunstar', **kwargs):
 	#BELOW SECTION: Puts together the magnitudes
 	if band not in bandlist:
 		raise ValueError("Oh no!  Looks like you passed an invalid band.  Please pass one of the these bands:\n" + str(bandlist) + "\n(Note that the default is 'Kepler'.)")
@@ -95,32 +96,19 @@ def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, band='Ke
 	uAraw = population.stars.Teff_A
 	uBraw = population.stars.logg_A
 	
+	#BELOW SECTION: Generates shuffled arrays of population data; allows duplicates
+	#Below generates an array of random indices; allows replacement; similar to bootstrapping technique
+	shuffledinds = np.random.randint(len(rAraw), size=(numruns*5))
 	
-	#BELOW SECTION: Shuffles the orbital parameters
-	#Below generates arrays to hold shuffled values
-	length = len(rAraw)
-	rAshuffle = np.zeros(length)
-	rBshuffle = np.zeros(length)
-	massAshuffle = np.zeros(length)
-	massBshuffle = np.zeros(length)
-	uAshuffle = np.zeros(length)
-	uBshuffle = np.zeros(length)
-	magshuffle = np.zeros(length)
-	
-	#Below shuffles the indices of the arrays
-	shuffledinds = np.arange(length)
-	np.random.shuffle(shuffledinds) #Shuffles the indices
-	
-	#Below fills the new arrays with shuffled values
-	for h in range(0, length):
-		rAshuffle[h] = rAraw[shuffledinds[h]]
-		rBshuffle[h] = rBraw[shuffledinds[h]]
-		massAshuffle[h] = massAraw[shuffledinds[h]]
-		massBshuffle[h] = massBraw[shuffledinds[h]]
-		uAshuffle[h] = uAraw[shuffledinds[h]]
-		uBshuffle[h] = uBraw[shuffledinds[h]]
-		magshuffle[h] = magraw[shuffledinds[h]]
-	
+	#Below shuffles the orbital parameters with the shuffled indices
+	rAshuffle = np.array(rAraw[shuffledinds])
+	rBshuffle = np.array(rBraw[shuffledinds])
+	massAshuffle = np.array(massAraw[shuffledinds])
+	massBshuffle = np.array(massBraw[shuffledinds])
+	uAshuffle = np.array(uAraw[shuffledinds])
+	uBshuffle = np.array(uBraw[shuffledinds])
+	magshuffle = np.array(magraw[shuffledinds])
+
 	
 	#BELOW SECTION: Runs model on the shuffled values
 	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band=band, plot=plot, savename=savename, poptype='Stars')
@@ -131,7 +119,7 @@ def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, band='Ke
 
 ##FUNCTION: genplanetpop
 #Purpose: This function is meant to generate a population of planets based upon read-in primary star values
-def genplanetpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=True, radiusbinsize=0.3, savename='exrunplanet', band='Kepler', **kwargs):	
+def genplanetpop(population=pop, rArange=.10, massArange=.10, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot=True, radiusbinsize=0.3, savename='exrunplanet', band='Kepler', **kwargs):	
 	#BELOW SECTION: Puts together the magnitudes
 	if band not in bandlist:
 		raise ValueError("Oh no!  Looks like you passed an invalid band.  Please pass one of the these bands:\n" + str(bandlist) + "\n(Note that the default is 'Kepler'.)")
@@ -140,34 +128,24 @@ def genplanetpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=T
 		magraw = population.stars[magkeyword]
 
 	#Below are star parameters, unshuffled
-	rAraw = population.stars.radius_A
-	massAraw = population.stars.mass_A
 	uAraw = population.stars.Teff_A
 	uBraw = population.stars.logg_A
 	
-	#BELOW SECTION: Shuffles the given orbital parameters
-	#Below generates arrays to hold shuffled values
-	length = len(rAraw)
-	rAshuffle = np.zeros(length)
-	massAshuffle = np.zeros(length)
-	uAshuffle = np.zeros(length)
-	uBshuffle = np.zeros(length)
-	magshuffle = np.zeros(length)
+	#BELOW SECTION: Generates shuffled arrays of population data; allows duplicates
+	#Below generates an array of random indices; allows replacement; similar to bootstrapping technique
+	shuffledinds = np.random.randint(len(uAraw), size=(numruns*5))
 	
-	#Below shuffles the indices of the arrays
-	shuffledinds = np.arange(length)
-	np.random.shuffle(shuffledinds) #Shuffles the indices
+	#Below shuffles the orbital parameters using the shuffled indices, with replacement
+	uAshuffle = np.array(uAraw[shuffledinds])
+	uBshuffle = np.array(uBraw[shuffledinds])
+	magshuffle = np.array(magraw[shuffledinds])
 	
-	#Below fills the new arrays with shuffled values
-	for i in range(0, length):
-		rAshuffle[i] = rAraw[shuffledinds[i]]
-		massAshuffle[i] = massAraw[shuffledinds[i]]
-		uAshuffle[i] = uAraw[shuffledinds[i]]
-		uBshuffle[i] = uBraw[shuffledinds[i]]
-		magshuffle[i] = magraw[shuffledinds[i]]
+	#BELOW SECTION: Generates random primary radii and masses
+	#Follows a Gaussian distribution about Sun's mass and Sun's radius using passed in uncertainties above
+	rAshuffle = np.random.normal(loc=rsun, scale=(rArange/4.0)*rsun, size=(numruns*5))/(rsun*1.0) #In units of solar radii
+	massAshuffle = np.random.normal(loc=masssun, scale=(massArange/4.0)*masssun, size=(numruns*5))/(masssun*1.0) #In units of solar masses
 	
-	
-	#BELOW SECTION: generates random planetary radii and masses, based upon ratio of Earth's radius to Sun's radius
+	#BELOW SECTION: Generates random planetary radii and masses, based upon ratio of Earth's radius to Sun's radius
 	#NOTE: Mostly follows the procedures for generating planetary populations as given in T. Morton's 'PlanetPopulation' code
 	#Below generates radius bin from which to uniformly draw radii
 	baseratio = (rearth/(rsun*1.0))*np.mean(np.ma.masked_array(rAshuffle, np.isnan(rAshuffle))) #Excludes nans
@@ -175,7 +153,7 @@ def genplanetpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=T
 	radiusbinmin = baseratio*(1 - radiusbinsize) #Min radius in bin
 	
 	#Below pulls radii randomly from given bin
-	rBshuffle = (np.random.random(length))*(radiusbinmax - radiusbinmin) + radiusbinmin
+	rBshuffle = (np.random.random(len(rAshuffle)))*(radiusbinmax - radiusbinmin) + radiusbinmin
 	#Below next generates masses based upon radii; same formula as used by T. Morton's planetary mass generation
 	massBshuffle = ((rBshuffle*rsun/(1.0*rearth))**2.06) * (massearth/(1.0*masssun))
 
@@ -188,7 +166,7 @@ def genplanetpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=T
 
 ##FUNCTION: comparepop
 #Purpose: This function is meant to generate both a star population and a planet population.  It will compare the generated results through plots and such.
-def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=True, radiusbinsize=0.3, savenameroot='exrun', band='Kepler', **kwargs):
+def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot=True, radiusbinsize=0.3, savenameroot='exrun', band='Kepler', **kwargs):
 	#BELOW SECTION: Generates results for star and planet populations
 	starpop = genstarpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=plot)
 	planetpop = genplanetpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'planet'), band=band, plot=plot)
@@ -242,6 +220,105 @@ def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=Tru
 	graph.legend(loc='best')
 	graph.savefig(savename+'Log10DepthExactvsT14-tauRatioBoth.png')
 	graph.close()
+	
+	
+	#Below returns dictionary containing population dictionaries
+	popdict = {'starpop':starpop, 'planetpop':planetpop}
+	return popdict
+##
+
+
+
+##FUNCTION: varypop
+#Purpose: This function is meant to plot populations with varied parameters, such as varied eccentricity inputs or varied period distributions.
+#Requires that the parameters periodp, ecca, and eccb be passed in as arrays of the same size.  Will treat the parameter arrays as a giant matrix and will overplot each set of entries for each singular plot.
+#For example, the first entries of each parameter array would be used to generate the first population; would plot for that population.
+def varypop(population=pop, poptype='Star', periodp=[1,2,3], ecca=[2,2,2], eccb=[2,2,2], numruns=int(1e4), radiusbinsize=0.3, savenameroot='exrunmulti', band='Kepler', **kwargs):
+	#BELOW SECTION: Some error control
+	#Below throws an error if passed-in values are not in list or np.array form
+	for part in [periodp, ecca, eccb]:
+		if not isinstance(part, list) and not isinstance(part, np.ndarray):
+			raise ValueError("Wait!  Please pass in all parameters periodp, ecca, and eccb in either list or numpy array form.")
+	#Below throws an error if mismatching parameter array lengths were passed in
+	if len(periodp) != len(ecca) or len(ecca) != len(eccb) or len(eccb) != len(periodp):
+		raise ValueError("Whoa!  It seems you passed in parameter arrays with mismatching lengths.  Please make sure your parameter arrays all have the same length.")
+	numhere = len(periodp) #Number of parameter sets
+	cols = cm.rainbow(np.linspace(0, 1, numhere)) #Colors to use
+
+	#BELOW SECTION: Generates plots for each parameter combination
+	savename = savenameroot+poptype #For recording graphs #For saving graphs
+	popdict = {}
+	popdict = {}
+	for a in range(0, numhere):
+		#BELOW SECTION: Generates results for populations for the current parameters
+		pophere = None #Declares variable
+		if poptype == 'Star':
+			pophere = genstarpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=False)
+		elif poptype == 'Planet':
+			pophere = genplanetpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'planet'), band=band, plot=False)
+		else:
+			raise ValueError("Looks like you passed an invalid value for poptype.")
+		
+		#Below adds these populations to the dictionary
+		popdict[str(a)] = pophere
+		
+	
+	#BELOW SECTION: Carries out the graphs to compare each set of parameters
+	#Hist: Periods
+	for b in range(0, numhere):
+		graph.hist(popdict[str(b)]['period']/yearsecs, alpha = .2, color=cols[b], label=('p='+str(popdict[str(b)]['periodp'])))
+	graph.title(str(popdict[str(b)]['poptype']) + ': Period Distribution: ' + str(popdict[str(b)]['numruns']) + ' Points')
+	graph.xlabel('Distribution (in Years)')
+	graph.ylabel('Counts')
+	graph.legend(loc='best')
+	graph.savefig(savename+'PerHist.png')
+	graph.close()
+
+	
+	#Hist: Eccentricities
+	for c in range(0, numhere):
+		graph.hist(popdict[str(c)]['ecc'], alpha = .2,  color=cols[c],label=('a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])))
+	graph.title(str(popdict[str(c)]['poptype']) + ': Eccentricity Distribution: ' + str(popdict[str(c)]['numruns']) + ' Points')
+	graph.xlabel('Distribution')
+	graph.ylabel('Counts')
+	graph.legend(loc='best')
+	graph.savefig(savename+'EccHist.png')
+	graph.close()
+
+	
+	
+	#BELOW SECTION: Plots based in form upon background research papers (specifically, on the 'Exoplanet Transit Validations...' Paper	
+	#Scatter: T14 (in days) vs. log10(Exact Depth)
+	for d in range(0, numhere):
+		graph.scatter(popdict[str(d)]['T14']/daysecs, np.log10(popdict[str(d)]['depthexact']), s=4, alpha=.2, edgecolors=cols[d], facecolors=None, label=('a='+str(popdict[str(d)]['ecca'])+', b='+str(popdict[str(d)]['eccb'])+', p='+str(popdict[str(d)]['periodp'])))
+	graph.title(str(popdict[str(d)]['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact): ' + str(popdict[str(d)]['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('Log10(Depth, Exact)')
+	graph.legend(loc='best')
+	graph.savefig(savename+'T14vsLog10DepthExact.png')
+	graph.close()
+	
+	
+	#Scatter: T14 (in days) vs. T14/tau
+	for e in range(0, numhere):
+		graph.scatter(popdict[str(e)]['T14']/daysecs, (popdict[str(e)]['T14'])/(popdict[str(e)]['tau']), s=4, alpha=.2, facecolors=None, edgecolors=cols[e], label=('a='+str(popdict[str(e)]['ecca'])+', b='+str(popdict[str(e)]['eccb'])+', p='+str(popdict[str(e)]['periodp'])))
+	graph.title(str(popdict[str(e)]['poptype']) + ': T14 (in Days) vs. T14/tau Ratio: ' + str(popdict[str(e)]['numruns']) + ' Points')
+	graph.xlabel('T14 in Days')
+	graph.ylabel('T14/tau Ratio')
+	graph.legend(loc='best')
+	graph.savefig(savename+'T14vsT14-tauRatio.png')
+	graph.close()
+	
+	
+	#Scatter: Log10(Depth, Exact) vs. T14/tau
+	for f in range(0, numhere):
+		graph.scatter(np.log10(popdict[str(f)]['depthexact']), (popdict[str(f)]['T14'])/(popdict[str(f)]['tau']), s=4, alpha=.2, facecolors=None, edgecolors=cols[f], label=('a='+str(popdict[str(f)]['ecca'])+', b='+str(popdict[str(f)]['eccb'])+', p='+str(popdict[str(f)]['periodp'])))
+	graph.title(str(popdict[str(f)]['poptype']) + ': Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(popdict[str(f)]['numruns']) + ' Points')
+	graph.xlabel('Log10(Depth, Exact)')
+	graph.ylabel('T14/tau Ratio')
+	graph.legend(loc='best')
+	graph.savefig(savename+'Log10DepthExactvsT14-tauRatio.png')
+	graph.close()
 ##
 
 
@@ -250,7 +327,7 @@ def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=9000, plot=Tru
 #Purpose: This function is meant to run a simulation to generate a population of statistics based upon passed in radii, masses, and (if needed) darkening parameters, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
 #Numruns indicates the number of stars.
 #Dependencies:
-def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, ecca=2, eccb=2, numruns=9000, poptype=None, plot=True, savename='exrun', band='Kepler', **kwargs):
+def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, ecca=2, eccb=2, numruns=int(1e4), poptype=None, plot=True, savename='exrun', band='Kepler', **kwargs):
 	#Note: totalruns specifies more than enough data to be used
 	#This allows room to screen out 'nan' values later in calctransit
 	totalruns = calc.ceil(numruns*1.01)
@@ -706,7 +783,10 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	T23done[nanplaces] = 0.0
 	
 	#Below fills in tau array; tau = (T14-T23)/2
-	taudone = (T14done - T23done)/2.0	
+	taudone = (T14done - T23done)/2.0
+	#Below replaces all taus below 30 minutes with the minimum cutoff of 30 minutes
+	cutoff = 60.0*30.0 #Number of seconds in thirty minutes
+	taudone[taudone < cutoff] = cutoff
 	
 	
 	#BELOW SECTION: Returns the calculated values
@@ -878,7 +958,11 @@ def makeperiod(n, p, rangestart=None, rangeend=None, dayunits=True):
 	
 	#BELOW SECTION: Samples random numbers in a certain range
 	#If no range given, then samples between zero and endrange generated below
-	if rangestart is None or rangeend is None:
+	#Throws an error if only one range endpoint given
+	if rangestart is None and rangeend is not None or rangestart is not None and rangeend is None:
+		raise ValueError("Oh no!  You only specified one range endpoint.  Please pass in both parameters 'rangestart' and 'rangeend' simultaneously, or do not give a range at all.")
+		
+	if rangestart is None and rangeend is None:
 		endrange = 10 #Gives the cutoff for random sampling, so random numbers drawn from sample [0, endrange)
 		randnum = np.zeros(n) #To hold random numbers
 		for a in range(0, n):
