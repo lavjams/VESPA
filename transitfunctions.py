@@ -8,7 +8,9 @@
 #Below imports necessary packages
 import numpy as np
 import math as calc
+import random as rand
 import matplotlib.pyplot as graph
+import matplotlib.patches as mpatch
 import matplotlib.cm as cm
 import astropy.constants as const
 #Below imports necessary functions from elsewhere
@@ -111,7 +113,7 @@ def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), band
 
 	
 	#BELOW SECTION: Runs model on the shuffled values
-	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band=band, plot=plot, savename=savename, poptype='Stars')
+	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band=band, plot=plot, savename=savename, poptype='Star')
 	return model
 	
 ##
@@ -119,7 +121,7 @@ def genstarpop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), band
 
 ##FUNCTION: genplanetpop
 #Purpose: This function is meant to generate a population of planets based upon read-in primary star values
-def genplanetpop(population=pop, rArange=.10, massArange=.10, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot=True, radiusbinsize=0.3, savename='exrunplanet', band='Kepler', **kwargs):	
+def genplanetpop(population=pop, rArange=.10, massArange=.10, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot=True, radiusratio=1.0, radiusbinsize=0.3, savename='exrunplanet', band='Kepler', **kwargs):	
 	#BELOW SECTION: Puts together the magnitudes
 	if band not in bandlist:
 		raise ValueError("Oh no!  Looks like you passed an invalid band.  Please pass one of the these bands:\n" + str(bandlist) + "\n(Note that the default is 'Kepler'.)")
@@ -148,7 +150,7 @@ def genplanetpop(population=pop, rArange=.10, massArange=.10, periodp=3, ecca=2,
 	#BELOW SECTION: Generates random planetary radii and masses, based upon ratio of Earth's radius to Sun's radius
 	#NOTE: Mostly follows the procedures for generating planetary populations as given in T. Morton's 'PlanetPopulation' code
 	#Below generates radius bin from which to uniformly draw radii
-	baseratio = (rearth/(rsun*1.0))*np.mean(np.ma.masked_array(rAshuffle, np.isnan(rAshuffle))) #Excludes nans
+	baseratio = (rearth*radiusratio/(rsun*1.0))*np.mean(np.ma.masked_array(rAshuffle, np.isnan(rAshuffle))) #Excludes nans
 	radiusbinmax = baseratio*(1 + radiusbinsize) #Max radius in bin
 	radiusbinmin = baseratio*(1 - radiusbinsize) #Min radius in bin
 	
@@ -159,72 +161,8 @@ def genplanetpop(population=pop, rArange=.10, massArange=.10, periodp=3, ecca=2,
 
 	
 	#BELOW SECTION: Runs model on the shuffled values
-	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band='Kepler', poptype='Planets', plot=plot, savename=savename)
+	model = runmodel(rAraw=rAshuffle, rBraw=rBshuffle, massAraw=massAshuffle, massBraw=massBshuffle, uAraw=uAshuffle, uBraw=uBshuffle, magraw=magshuffle, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, band='Kepler', poptype='Planet', radiusratio=radiusratio, plot=plot, savename=savename)
 	return model
-##
-
-
-##FUNCTION: comparepop
-#Purpose: This function is meant to generate both a star population and a planet population.  It will compare the generated results through plots and such.
-def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot=True, radiusbinsize=0.3, savenameroot='exrun', band='Kepler', **kwargs):
-	#BELOW SECTION: Generates results for star and planet populations
-	starpop = genstarpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=plot)
-	planetpop = genplanetpop(population=pop, periodp=periodp, ecca=ecca, eccb=eccb, numruns=numruns, savename=(str(savenameroot)+'planet'), band=band, plot=plot)
-	savename = savenameroot #For recording graphs
-	
-	
-	#BELOW SECTION: Plots overlying values of populations
-		#Scatter: Period vs. T14, both in days
-	graph.scatter(starpop['period']/yearsecs, starpop['T14']/daysecs, s=4, alpha=.35, color='blue', label='Stars')
-	graph.scatter(planetpop['period']/yearsecs, planetpop['T14']/daysecs, s=4, alpha=.35, color='orange', label='Planets')
-	graph.title('Periods vs. T14: ' + str(starpop['numruns']) + ' Points')
-	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
-	graph.xlabel('Periods in Years')
-	graph.ylabel('T14 in Days')
-	graph.legend(loc='best')
-	graph.savefig(savename+'PervsT14Both.png')
-	graph.close()
-
-
-	#Scatter: T14 (in days) vs. log10(Exact Depth)
-	graph.scatter(starpop['T14']/daysecs, np.log10(starpop['depthexact']),s=4, alpha=.35, color='purple', label='Stars')
-	graph.scatter(planetpop['T14']/daysecs, np.log10(planetpop['depthexact']),s=4, alpha=.35, color='red', label='Planets')
-	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
-	graph.title('T14 (in Days) vs. Log10(Depth, Exact): ' + str(starpop['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('Log10(Depth, Exact)')
-	graph.legend(loc='best')
-	graph.savefig(savename+'T14vsLog10DepthExactBoth.png')
-	graph.close()
-	
-	
-	#Scatter: T14 (in days) vs. T14/tau
-	graph.scatter(starpop['T14']/daysecs, (starpop['T14'])/(starpop['tau']),s=4, alpha=.35, color='blue', label='Stars')
-	graph.scatter(planetpop['T14']/daysecs, (planetpop['T14'])/(planetpop['tau']),s=4, alpha=.35, color='orange', label='Planets')
-	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
-	graph.title('T14 (in Days) vs. T14/tau Ratio: ' + str(starpop['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('T14/tau Ratio')
-	graph.legend(loc='best')
-	graph.savefig(savename+'T14vsT14-tauRatioBoth.png')
-	graph.close()
-	
-	
-	#Scatter: Log10(Depth, Exact) vs. T14/tau
-	graph.scatter(np.log10(starpop['depthexact']), (starpop['T14'])/(starpop['tau']),s=4, alpha=.35, color='purple', label='Stars')
-	graph.scatter(np.log10(planetpop['depthexact']), (planetpop['T14'])/(planetpop['tau']),s=4, alpha=.35, color='red', label='Planets')
-	graph.suptitle('Parameters: ecca=' + str(starpop['ecca']) + ', eccb=' + str(starpop['eccb']) + ', periodp=' + str(starpop['periodp']))
-	graph.title('Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(starpop['numruns']) + ' Points')
-	graph.xlabel('Log10(Depth, Exact)')
-	graph.ylabel('T14/tau Ratio')
-	graph.legend(loc='best')
-	graph.savefig(savename+'Log10DepthExactvsT14-tauRatioBoth.png')
-	graph.close()
-	
-	
-	#Below returns dictionary containing population dictionaries
-	popdict = {'starpop':starpop, 'planetpop':planetpop}
-	return popdict
 ##
 
 
@@ -233,29 +171,30 @@ def comparepop(population=pop, periodp=3, ecca=2, eccb=2, numruns=int(1e4), plot
 #Purpose: This function is meant to plot populations with varied parameters, such as varied eccentricity inputs or varied period distributions.
 #Requires that the parameters periodp, ecca, and eccb be passed in as arrays of the same size.  Will treat the parameter arrays as a giant matrix and will overplot each set of entries for each singular plot.
 #For example, the first entries of each parameter array would be used to generate the first population; would plot for that population.
-def varypop(population=pop, poptype='Star', periodp=[1,2,3], ecca=[2,2,2], eccb=[2,2,2], numruns=int(1e4), radiusbinsize=0.3, savenameroot='exrunmulti', band='Kepler', **kwargs):
+def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], ecca=[2,2,2], eccb=[2,2,2], numruns=int(1e4), radiusratio=[1,1,1], radiusbinsize=0.3, savenameroot='exrunmulti', band='Kepler', **kwargs):
 	#BELOW SECTION: Some error control
 	#Below throws an error if passed-in values are not in list or np.array form
 	for part in [periodp, ecca, eccb]:
 		if not isinstance(part, list) and not isinstance(part, np.ndarray):
-			raise ValueError("Wait!  Please pass in all parameters periodp, ecca, and eccb in either list or numpy array form.")
+			raise ValueError("Wait!  Please pass in all parameters periodp, ecca, and eccb in either list or numpy array form.  The parameter poptype should of course be a list.")
 	#Below throws an error if mismatching parameter array lengths were passed in
-	if len(periodp) != len(ecca) or len(ecca) != len(eccb) or len(eccb) != len(periodp):
+	if len(periodp) != len(ecca) or len(ecca) != len(eccb) or len(eccb) != len(periodp) or len(poptype) != len(periodp):
 		raise ValueError("Whoa!  It seems you passed in parameter arrays with mismatching lengths.  Please make sure your parameter arrays all have the same length.")
 	numhere = len(periodp) #Number of parameter sets
-	cols = cm.rainbow(np.linspace(0, 1, numhere)) #Colors to use
-
+	cols = cm.brg(np.linspace(0, 1, numhere)) #Colors to use
+	graph.close() #Just in case
+	
+	
 	#BELOW SECTION: Generates plots for each parameter combination
-	savename = savenameroot+poptype #For recording graphs #For saving graphs
-	popdict = {}
+	savename = savenameroot #For recording graphs #For saving graphs
 	popdict = {}
 	for a in range(0, numhere):
 		#BELOW SECTION: Generates results for populations for the current parameters
 		pophere = None #Declares variable
-		if poptype == 'Star':
+		if poptype[a] == 'Star':
 			pophere = genstarpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=False)
-		elif poptype == 'Planet':
-			pophere = genplanetpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'planet'), band=band, plot=False)
+		elif poptype[a] == 'Planet':
+			pophere = genplanetpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'planet'), radiusratio=float(radiusratio[a]), band=band, plot=False)
 		else:
 			raise ValueError("Looks like you passed an invalid value for poptype.")
 		
@@ -266,59 +205,170 @@ def varypop(population=pop, poptype='Star', periodp=[1,2,3], ecca=[2,2,2], eccb=
 	#BELOW SECTION: Carries out the graphs to compare each set of parameters
 	#Hist: Periods
 	for b in range(0, numhere):
-		graph.hist(popdict[str(b)]['period']/yearsecs, alpha = .2, color=cols[b], label=('p='+str(popdict[str(b)]['periodp'])))
-	graph.title(str(popdict[str(b)]['poptype']) + ': Period Distribution: ' + str(popdict[str(b)]['numruns']) + ' Points')
-	graph.xlabel('Distribution (in Years)')
+		popformhere = None #Population form name
+		if poptype[b] == 'Star':
+			popformhere = poptype[b] + ': '
+		elif poptype[b] == 'Planet':
+			popformhere = poptype[b] + ' (' + str(radiusratio[b]) + '$R_E$): '
+		labelhere = (popformhere+'p='+str(popdict[str(b)]['periodp']))
+		graph.hist(popdict[str(b)]['period']/yearsecs, histtype='step', color=cols[b], label=labelhere)
+		
+	graph.title('Period Distribution (in Years)')
+	graph.xlabel('Period (in Years)')
 	graph.ylabel('Counts')
-	graph.legend(loc='best')
+	graph.legend(loc=8, prop={'size':14})
 	graph.savefig(savename+'PerHist.png')
 	graph.close()
-
+	#
+	
 	
 	#Hist: Eccentricities
 	for c in range(0, numhere):
-		graph.hist(popdict[str(c)]['ecc'], alpha = .2,  color=cols[c],label=('a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])))
-	graph.title(str(popdict[str(c)]['poptype']) + ': Eccentricity Distribution: ' + str(popdict[str(c)]['numruns']) + ' Points')
-	graph.xlabel('Distribution')
+		popformhere = None #Population form name
+		if poptype[c] == 'Star':
+			popformhere = poptype[c] + ': '
+		elif poptype[c] == 'Planet':
+			popformhere = poptype[c] + ' (' + str(radiusratio[c]) + '$R_E$): '
+		labelhere = (popformhere+'a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb']))
+		graph.hist(popdict[str(c)]['ecc'], histtype='step',  color=cols[c],label=labelhere)
+	
+	graph.title('Eccentricity Distribution')
+	graph.xlabel('Eccentricity')
 	graph.ylabel('Counts')
-	graph.legend(loc='best')
+	graph.legend(loc='best', prop={'size':14})
 	graph.savefig(savename+'EccHist.png')
 	graph.close()
+	#
+	
+	
+	#Hist: T14 (in days); Outliers cut out
+	for c in range(0, numhere):
+		popformhere = None #Population form name
+		if poptype[c] == 'Star':
+			popformhere = poptype[c] + ': '
+		elif poptype[c] == 'Planet':
+			popformhere = poptype[c] + ' (' + str(radiusratio[c]) + '$R_E$): '
+		xhere = popdict[str(c)]['T14']/daysecs
+		labelhere = (popformhere+'a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])+', p='+str(popdict[str(c)]['periodp']))
+		graph.hist(xhere[xhere < 5], histtype='step',  color=cols[c],label=labelhere)
+	
+	graph.title('T14 (in Days) Distribution')
+	graph.xlabel('T14 (in Days)')
+	graph.ylabel('Counts')
+	graph.legend(loc='best', prop={'size':14})
+	graph.savefig(savename+'T14Hist.png')
+	graph.close()
+	#
+	
+	
+	#Hist: T14/tau; Outliers cut out
+	for c in range(0, numhere):
+		popformhere = None #Population form name
+		if poptype[c] == 'Star':
+			popformhere = poptype[c] + ': '
+		elif poptype[c] == 'Planet':
+			popformhere = poptype[c] + ' (' + str(radiusratio[c]) + '$R_E$): '
+		xhere = popdict[str(c)]['T14']/popdict[str(c)]['tau']
+		labelhere = (popformhere+'a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])+', p='+str(popdict[str(c)]['periodp']))
+		graph.hist(xhere[xhere < 10], histtype='step',  color=cols[c],label=labelhere)
+	
+	graph.title('T14/Tau Distribution')
+	graph.xlabel('T14/Tau')
+	graph.ylabel('Counts')
+	graph.legend(loc='best', prop={'size':14})
+	graph.savefig(savename+'T14-tauRatioHist.png')
+	graph.close()
+	#
+	
 
 	
 	
 	#BELOW SECTION: Plots based in form upon background research papers (specifically, on the 'Exoplanet Transit Validations...' Paper	
-	#Scatter: T14 (in days) vs. log10(Exact Depth)
+	#Scatter: T14 (in days) vs. log10(Exact Depth), Zoomed
+	patches = []
 	for d in range(0, numhere):
-		graph.scatter(popdict[str(d)]['T14']/daysecs, np.log10(popdict[str(d)]['depthexact']), s=4, alpha=.2, edgecolors=cols[d], facecolors=None, label=('a='+str(popdict[str(d)]['ecca'])+', b='+str(popdict[str(d)]['eccb'])+', p='+str(popdict[str(d)]['periodp'])))
-	graph.title(str(popdict[str(d)]['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact): ' + str(popdict[str(d)]['numruns']) + ' Points')
+		popformhere = None #Population form name
+		if poptype[d] == 'Star':
+			popformhere = poptype[d] + ': '
+		elif poptype[d] == 'Planet':
+			popformhere = poptype[d] + ' (' + str(radiusratio[d]) + '$R_E$): '
+		labelhere = (popformhere+'a='+str(popdict[str(d)]['ecca'])+', b='+str(popdict[str(d)]['eccb'])+', p='+str(popdict[str(d)]['periodp']))
+		
+		#Below takes care of labeling
+		patches.append(mpatch.Patch(color=cols[d], label=labelhere))
+		x = popdict[str(d)]['T14']/daysecs
+		y = np.log10(popdict[str(d)]['depthexact'])
+		lins = np.linspace(0,1,numhere)
+		graph.scatter(x, y, facecolors='black', edgecolors=cols[d], s=2,alpha=(1-((d+1)/(len(lins)*1.0+1)))*.2)
+		
+	graph.title('T14 (in Days) vs. Log10(Depth, Exact)')
 	graph.xlabel('T14 in Days')
 	graph.ylabel('Log10(Depth, Exact)')
-	graph.legend(loc='best')
-	graph.savefig(savename+'T14vsLog10DepthExact.png')
+	graph.xlim([-1, 5])
+	graph.legend(loc='best', handles=patches, prop={'size':10})
+	graph.savefig(savename+'T14vsLog10DepthExactZoom.png')
 	graph.close()
+	#
 	
 	
-	#Scatter: T14 (in days) vs. T14/tau
+
+	#Scatter: T14 (in days) vs. T14/tau, Zoomed
+	patches = []
 	for e in range(0, numhere):
-		graph.scatter(popdict[str(e)]['T14']/daysecs, (popdict[str(e)]['T14'])/(popdict[str(e)]['tau']), s=4, alpha=.2, facecolors=None, edgecolors=cols[e], label=('a='+str(popdict[str(e)]['ecca'])+', b='+str(popdict[str(e)]['eccb'])+', p='+str(popdict[str(e)]['periodp'])))
-	graph.title(str(popdict[str(e)]['poptype']) + ': T14 (in Days) vs. T14/tau Ratio: ' + str(popdict[str(e)]['numruns']) + ' Points')
+		popformhere = None #Population form name
+		if poptype[e] == 'Star':
+			popformhere = poptype[e] + ': '
+		elif poptype[e] == 'Planet':
+			popformhere = poptype[e] + ' (' + str(radiusratio[e]) + '$R_E$): '
+		labelhere = (popformhere+'a='+str(popdict[str(e)]['ecca'])+', b='+str(popdict[str(e)]['eccb'])+', p='+str(popdict[str(e)]['periodp']))
+	
+		#Below takes care of labeling
+		patches.append(mpatch.Patch(color=cols[e], label=labelhere))
+		x = popdict[str(e)]['T14']/daysecs
+		y = (popdict[str(e)]['T14'])/(popdict[str(e)]['tau'])
+		lins = np.linspace(0,1,numhere)
+		graph.scatter(x, y, facecolors='black', edgecolors=cols[e], s=2,alpha=(1-((e+1)/(len(lins)*1.0+1)))*.2)
+	
+	graph.title('T14 (in Days) vs. T14/tau Ratio')
 	graph.xlabel('T14 in Days')
 	graph.ylabel('T14/tau Ratio')
-	graph.legend(loc='best')
+	graph.xlim([-.5, 5])
+	graph.ylim([-1, 150])
+	graph.legend(loc='upper left', handles=patches, prop={'size':10})
 	graph.savefig(savename+'T14vsT14-tauRatio.png')
 	graph.close()
 	
 	
-	#Scatter: Log10(Depth, Exact) vs. T14/tau
+	
+	#Scatter: Log10(Depth, Exact) vs. T14/tau, Zoomed
+	patches = []
 	for f in range(0, numhere):
-		graph.scatter(np.log10(popdict[str(f)]['depthexact']), (popdict[str(f)]['T14'])/(popdict[str(f)]['tau']), s=4, alpha=.2, facecolors=None, edgecolors=cols[f], label=('a='+str(popdict[str(f)]['ecca'])+', b='+str(popdict[str(f)]['eccb'])+', p='+str(popdict[str(f)]['periodp'])))
-	graph.title(str(popdict[str(f)]['poptype']) + ': Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(popdict[str(f)]['numruns']) + ' Points')
+		popformhere = None #Population form name
+		if poptype[f] == 'Star':
+			popformhere = poptype[f] + ': '
+		elif poptype[f] == 'Planet':
+			popformhere = poptype[f] + ' (' + str(radiusratio[f]) + '$R_E$): '
+		labelhere = (popformhere+'a='+str(popdict[str(f)]['ecca'])+', b='+str(popdict[str(f)]['eccb'])+', p='+str(popdict[str(f)]['periodp']))
+		
+		#Below takes care of labeling
+		patches.append(mpatch.Patch(color=cols[f], label=labelhere))
+		x = np.log10(popdict[str(f)]['depthexact'])
+		y = (popdict[str(f)]['T14'])/(popdict[str(f)]['tau'])
+		lins = np.linspace(0,1,numhere)
+		graph.scatter(x, y, facecolors='black', edgecolors=cols[f], s=2,alpha=(1-((e+1)/(len(lins)*1.0+1)))*.2)
+		
+	graph.title('Log10(Depth, Exact) vs. T14/tau Ratio')
 	graph.xlabel('Log10(Depth, Exact)')
 	graph.ylabel('T14/tau Ratio')
-	graph.legend(loc='best')
-	graph.savefig(savename+'Log10DepthExactvsT14-tauRatio.png')
+	graph.xlim([-8, 1])
+	graph.ylim([-10, 100])
+	graph.legend(loc='best', handles=patches, prop={'size':10})
+	graph.savefig(savename+'Log10DepthExactvsT14-tauRatioZoom.png')
 	graph.close()
+	
+	
+	#Returns finished dictionary of populations
+	return popdict
 ##
 
 
@@ -327,7 +377,7 @@ def varypop(population=pop, poptype='Star', periodp=[1,2,3], ecca=[2,2,2], eccb=
 #Purpose: This function is meant to run a simulation to generate a population of statistics based upon passed in radii, masses, and (if needed) darkening parameters, and then perform transit calculations.  It accepts one value to generate period distributions (power law distribution to power periodp) and two values to generate eccentricity distributions (eccentricity distribution with alpha ecca and beta eccb).
 #Numruns indicates the number of stars.
 #Dependencies:
-def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, ecca=2, eccb=2, numruns=int(1e4), poptype=None, plot=True, savename='exrun', band='Kepler', **kwargs):
+def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, ecca=2, eccb=2, numruns=int(1e4), radiusratio=None, poptype=None, plot=True, savename='exrun', band='Kepler', **kwargs):
 	#Note: totalruns specifies more than enough data to be used
 	#This allows room to screen out 'nan' values later in calctransit
 	totalruns = calc.ceil(numruns*1.01)
@@ -407,7 +457,7 @@ def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, 
 		#Below computes semi and angle with current values
 		semi = semihere
 		#anglehere = calcminangle(period=periodhere, mass1=massAraw[totalplace], mass2=massBraw[totalplace], r1=rhere, r2=rnothere)
-		anglehere = calcangle(period=periodhere, r1=rhere, semi=semihere, omega=omegas[track], imp=impsraw[totalplace], ecc=eccs[track])
+		anglehere = calcangle(period=periodhere, r1=rhere, semi=semihere, omega=omegas[track]*pi/180.0, imp=impsraw[totalplace], ecc=eccs[track])
 
 		#Below keeps data if valid angle parameter was produced; throws out otherwise
 		if not calc.isnan(anglehere):
@@ -442,7 +492,7 @@ def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, 
 		
 				
 	#BELOW SECTION: Calculates transit values
-	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, mag=mag, numruns=numruns, ecca=ecca, eccb=eccb, band=band, periodp=periodp, poptype=poptype)
+	transitvals = calctransit(mass1=massA, massp=massB, r1=rA, r2=rB, period=periods, ecc=eccs, angle=angles, imp=imps, omega=omegas, u1=uA, u2=uB, mag=mag, numruns=numruns, ecca=ecca, eccb=eccb, band=band, periodp=periodp, poptype=poptype, radiusratio=radiusratio)
 	
 	#BELOW SECTION: Graphs transit values if passed-in parameter 'plot' set as 'True'
 	if plot == True:
@@ -453,153 +503,6 @@ def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, 
 ##
 
 
-##FUNCTION: plotmodel
-#Purpose: This function is meant to run several plots, given a dictionary of transit values
-#Dependencies:
-def plotmodel(transitdict, savename='exrun'):
-	#BELOW SECTION: General plots of parameters
-	
-	#Hist: Periods
-	graph.hist(transitdict['period']/yearsecs, alpha = .35, color='green')
-	graph.title(str(transitdict['poptype']) + ': Period Distribution: ' + str(transitdict['numruns']) + ' Points')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.xlabel('Distribution (in Years)')
-	graph.ylabel('Counts')
-	graph.savefig(savename+'PerHist.png')
-	graph.close()
-
-	
-	#Hist: Eccentricities
-	graph.hist(transitdict['ecc'], alpha = .35, color='orange')
-	graph.title(str(transitdict['poptype']) + ': Eccentricity Distribution: ' + str(transitdict['numruns']) + ' Points')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.xlabel('Distribution')
-	graph.ylabel('Counts')
-	graph.savefig(savename+'EccHist.png')
-	graph.close()
-
-	
-	#Scatter: Prob vs. T14 (in days)
-	graph.scatter(transitdict['prob'], transitdict['T14']/daysecs, s=4, alpha=.35, color='brown')
-	graph.title(str(transitdict['poptype']) + ': Transit Probability vs. T14: ' + str(transitdict['numruns']) + ' Points')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.xlabel('Transit Probability')
-	graph.ylabel('T14 in Days')
-	graph.savefig(savename+'ProbvsT14.png')
-	graph.close()
-
-
-	#Scatter: Period vs. T14, both in days
-	graph.scatter(transitdict['period']/yearsecs, transitdict['T14']/daysecs, s=4, alpha=.35, color='green')
-	graph.title(str(transitdict['poptype']) + ': Periods vs. T14: ' + str(transitdict['numruns']) + ' Points')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.xlabel('Periods in Years')
-	graph.ylabel('T14 in Days')
-	graph.savefig(savename+'PervsT14.png')
-	graph.close()
-
-
-	#Scatter: T14 (in days) vs. Exact Depth
-	graph.scatter(transitdict['T14']/daysecs, transitdict['depthexact'], s=4, alpha=.35, color='blue')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Depth, Exact: ' + str(transitdict['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('Depth, Exact')
-	graph.savefig(savename+'T14vsDepthExact.png')
-	graph.close()
-	
-	
-	
-	#BELOW SECTION: Plots based in form upon background research papers (specifically, on the 'Exoplanet Transit Validations...' Paper
-	
-	#Scatter: T14 (in days) vs. log10(Exact Depth)
-	graph.scatter(transitdict['T14']/daysecs, np.log10(transitdict['depthexact']), s=4, alpha=.35, color='blue')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact): ' + str(transitdict['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('Log10(Depth, Exact)')
-	graph.savefig(savename+'T14vsLog10DepthExact.png')
-	graph.close()
-	
-	
-	#Scatter: T14 (in days) vs. T14/tau
-	graph.scatter(transitdict['T14']/daysecs, (transitdict['T14'])/(transitdict['tau']), s=4, alpha=.35, color='blue')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. T14/tau Ratio: ' + str(transitdict['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('T14/tau Ratio')
-	graph.savefig(savename+'T14vsT14-tauRatio.png')
-	graph.close()
-	
-	
-	#Scatter: Log10(Depth, Exact) vs. T14/tau
-	graph.scatter(np.log10(transitdict['depthexact']), (transitdict['T14'])/(transitdict['tau']), s=4, alpha=.35, color='purple')
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.title(str(transitdict['poptype']) + ': Log10(Depth, Exact) vs. T14/tau Ratio: ' + str(transitdict['numruns']) + ' Points')
-	graph.xlabel('Log10(Depth, Exact)')
-	graph.ylabel('T14/tau Ratio')
-	graph.savefig(savename+'Log10DepthExactvsT14-tauRatio.png')
-	graph.close()
-	
-	
-	
-	#BELOW SECTION: More developed plots
-	
-	#Scatter: T14 (in days) vs. Log10(Exact Depth); Periods colored by bin
-	#Below colors each dot depending on the period
-	t14days = transitdict['T14']/daysecs #T14 in days
-	dexactlog10 = np.log10(transitdict['depthexact']) #Log10 of depth exact
-	perdays = transitdict['period']/daysecs #Periods in days
-	maxperrounded = max(perdays) #Maximum period for this run
-	minperrounded = min(perdays) #Minimum period for this run
-	print('Note: maxperrounded as ', maxperrounded) #####
-	numspace = 5.0 #Number of intervals
-	spacing = (maxperrounded-minperrounded) / numspace #Space within bins
-	t14dayslists = [[] for _ in range(5)]
-	dexactlog10lists = [[] for _ in range(5)]
-	
-	for a in range(0, len(t14days)):
-		if minperrounded < perdays[a] and perdays[a] <= minperrounded + spacing:
-			t14dayslists[0].append(t14days[a])
-			dexactlog10lists[0].append(dexactlog10[a])
-
-		elif minperrounded + spacing < perdays[a] and perdays[a] <= minperrounded + spacing*2.0:
-			t14dayslists[1].append(t14days[a])
-			dexactlog10lists[1].append(dexactlog10[a])
-
-		elif minperrounded + spacing*2.0 < perdays[a] and perdays[a] <= minperrounded + spacing*3.0:
-			t14dayslists[2].append(t14days[a])
-			dexactlog10lists[2].append(dexactlog10[a])
-
-		elif minperrounded + spacing*3.0 < perdays[a] and perdays[a] <= minperrounded + spacing*4.0:
-			t14dayslists[3].append(t14days[a])
-			dexactlog10lists[3].append(dexactlog10[a])
-
-		elif minperrounded + spacing*4.0 < perdays[a] and perdays[a] <= maxperrounded:
-			t14dayslists[4].append(t14days[a])
-			dexactlog10lists[4].append(dexactlog10[a])
-	
-	spacingyears = round((spacing / yeardays), 2)
-	minperyearrounded = round(minperrounded/yeardays, 2)
-	maxperyearrounded = round(maxperrounded/yeardays, 2)
-	
-	graph.scatter(t14dayslists[0], dexactlog10lists[0], s=4, alpha=.35, color='cyan', label=(str(minperyearrounded) + '-' + str(minperyearrounded+spacingyears) + ' Years'))
-	graph.scatter(t14dayslists[1], dexactlog10lists[1], s=4, alpha=.35, color='blue', label=(str(minperyearrounded+spacingyears) + '-' + str(minperyearrounded+spacingyears*2) + ' Years'))
-	graph.scatter(t14dayslists[2], dexactlog10lists[2], s=4, alpha=.35, color='green', label=(str(minperyearrounded+spacingyears*2) + '-' + str(minperyearrounded+spacingyears*3) + ' Years'))
-	graph.scatter(t14dayslists[3], dexactlog10lists[3], s=4, alpha=.35, color='purple', label=(str(minperyearrounded+spacingyears*3) + '-' + str(minperyearrounded+spacingyears*4) + ' Years'))
-	graph.scatter(t14dayslists[4], dexactlog10lists[4], s=4, alpha=.35, color='black', label=(str(minperyearrounded+spacingyears*4) + '-' + str(maxperyearrounded) + ' Years'))
-				
-	graph.suptitle('Parameters: ecca=' + str(transitdict['ecca']) + ', eccb=' + str(transitdict['eccb']) + ', periodp=' + str(transitdict['periodp']))
-	graph.title(str(transitdict['poptype']) + ': T14 (in Days) vs. Log10(Depth, Exact), with Colored Periods: ' + str(transitdict['numruns']) + ' Points')
-	graph.xlabel('T14 in Days')
-	graph.ylabel('Log10(Depth, Exact)')
-	graph.legend(loc='best')
-	graph.savefig(savename+'T14vsLog10DepthExactwithPerColors.png')
-	graph.close()
-	
-##
-
-
 
 
 ###BASE CALCULATIONS
@@ -607,52 +510,52 @@ def plotmodel(transitdict, savename='exrun'):
 #Purpose: This function is meant to accept several inputs in cgs units (except for period, which should be given in days), including primary and orbiting masses (mass1 and massp), primary and orbiting radii (r1 and r2), a period (period), eccentricity (ecc), omega (omega), angle (angle), impact parameter (imp), and limb darkening (u1 and u2).
 #It calculates analytically several aspects of the transit curve, including full width (T14), mid width (T23), transit probability (prob), exact depth (depthexact), and approximate depth (depthappr).
 #Dependencies: calcsemimajor
-def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, mag=None, numruns=100, ecca=None, eccb=None, periodp=None, band='Kepler', poptype=None, **kwargs):
+def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None, angle=None, imp=None, omega=None, u1=None, u2=None, mag=None, numruns=100, ecca=None, eccb=None, periodp=None, band='Kepler', poptype=None, radiusratio=None, **kwargs):
 	#Below makes sure necessary parameters have been passed
 	if mass1 is None or massp is None or r1 is None or r2 is None or period is None or ecc is None or angle is None or imp is None or omega is None:
 		raise ValueError('Please pass in all of the following parameters with correct values using cgs units: mass1 (primary mass), massp (orbiting mass), r1 and r2 (primary and orbiting radius), period, ecc (eccentricity), angle (given as i usually), omega, and imp (impact parameter b).')
-	if isinstance(mass1, int):
+	if isinstance(mass1, float) or isinstance(mass1, int):
 		if numruns != 1:
 			raise ValueError("It appears that the number of runs you specified is greater than the number of values (i.e, the number of mass1s) that you passed into the function.  Please specify a valid number of runs under the parameter 'numruns'.")
 
-	elif numruns > len(np.array(mass1)):
+	elif numruns > len(np.asarray(mass1)):
 		raise ValueError("It appears that the number of runs you specified is greater than the number of values (i.e, the number of mass1s) that you passed into the function.  Please specify a valid number of runs under the parameter 'numruns'.")
 
 	#BELOW SECTION: Calculates some constants for calculations
 	#Below converts everything to numpy arrays
-	if not isinstance(mass1, int):
-		mass1 = np.array(mass1)
-		massp = np.array(massp)
-		r1 = np.array(r1)
-		r2 = np.array(r2)
-		period = np.array(period)
-		ecc = np.array(ecc)
-		angle = np.array(angle)
-		imp = np.array(imp)
+	if not isinstance(mass1, float) and not isinstance(mass1, int):
+		mass1 = np.asarray(mass1)
+		massp = np.asarray(massp)
+		r1 = np.asarray(r1)
+		r2 = np.asarray(r2)
+		period = np.asarray(period)
+		ecc = np.asarray(ecc)
+		angle = np.asarray(angle)
+		imp = np.asarray(imp)
 		
 		if omega is not None:
-			omega = np.array(omega)
+			omega = np.asarray(omega)
 		if u1 is not None and u2 is not None:
-			u1 = np.array(u1)
-			u2 = np.array(u2)
+			u1 = np.asarray(u1)
+			u2 = np.asarray(u2)
 			
 	else: #If singular values passed in
-		mass1 = np.array([mass1])
-		massp = np.array([massp])
-		r1 = np.array([r1])
-		r2 = np.array([r2])
-		period = np.array([period])
-		ecc = np.array([ecc])
-		angle = np.array([angle])
-		imp = np.array([imp])
+		mass1 = np.asarray([mass1])
+		massp = np.asarray([massp])
+		r1 = np.asarray([r1])
+		r2 = np.asarray([r2])
+		period = np.asarray([period])
+		ecc = np.asarray([ecc])
+		angle = np.asarray([angle])
+		imp = np.asarray([imp])
 		
 		if omega is not None:
-			omega = np.array([omega])
+			omega = np.asarray([omega])
 		if u1 is not None and u2 is not None:
-			u1 = np.array([u1])
-			u2 = np.array([u2])
+			u1 = np.asarray([u1])
+			u2 = np.asarray([u2])
 
-	
+
 	#Below sets larger and smaller radii
 	rs = np.zeros(len(mass1))
 	rp = np.zeros(len(mass1))
@@ -765,7 +668,8 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 		probdone[track] = prob[placehere]
 		depthapprdone[track] = depthappr[placehere]
 		depthexactdone[track] = depthexact[placehere]
-		magdone[track] = mag[placehere]
+		if mag is not None:
+			magdone[track] = mag[placehere]
 		
 		#Below increments counts and tracking variables
 		track = track + 1
@@ -790,7 +694,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	
 	
 	#BELOW SECTION: Returns the calculated values
-	done = {'T14':T14done, 'T23':T23done, 'tau':taudone, 'prob':probdone, 'depthapprox':depthapprdone, 'depthexact':depthexactdone, 'mass1':mass1done, 'mass2':masspdone, 'r1':r1done, 'r2':r2done, 'period':perioddone, 'semi':semidone, 'ecc':eccdone, 'angle':angledone, 'imp':impdone, 'omega':omegadone, 'u1':u1done, 'u2':u2done, 'ecca':ecca, 'eccb':eccb, 'periodp':periodp, 'numruns':numruns, 'mag':mag, 'band':band, 'poptype':poptype}
+	done = {'T14':T14done, 'T23':T23done, 'tau':taudone, 'prob':probdone, 'depthapprox':depthapprdone, 'depthexact':depthexactdone, 'mass1':mass1done, 'mass2':masspdone, 'r1':r1done, 'r2':r2done, 'period':perioddone, 'semi':semidone, 'ecc':eccdone, 'angle':angledone, 'imp':impdone, 'omega':omegadone, 'u1':u1done, 'u2':u2done, 'ecca':ecca, 'eccb':eccb, 'periodp':periodp, 'numruns':numruns, 'mag':mag, 'band':band, 'poptype':poptype, 'radiusratio':radiusratio}
 
 	#Below returns generated values
 	return done
@@ -812,7 +716,7 @@ def calcsemimajor(period, massstar):
 ##
 
 
-##FUNCTION: calcomega
+##FUNCTION: calcomega; WRONG?!? OUTDATED
 #Purpose: This function calculates omega based upon the given semimajor axis (semi), impact parameter (imp), eccentricity (ecc), primary radius (rs), and angle (angle).
 def calcomega(semi, imp, ecc, rs, angle, shift=False):
 	#Omega formula derived from Winn paper on Transits and Occultations
@@ -842,7 +746,7 @@ def calcangle(period, semi, r1, omega, imp, ecc):
 	#Below calculates angle from impact parameter formula given in Winn paper
 	val1 = (imp*rsun*r1)/semi
 	val2 = (1 + ecc*np.sin(omega))/(1.0 - ecc**2.0)
-	anglehere = np.arccos(val1*val2)
+	anglehere = np.arccos(val1*val2)*180.0/(1.0*pi)
 	
 	#Below returns calculated angle
 	return anglehere
