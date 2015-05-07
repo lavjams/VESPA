@@ -13,6 +13,10 @@ import matplotlib.pyplot as graph
 import matplotlib.patches as mpatch
 import matplotlib.cm as cm
 import astropy.constants as const
+from scipy.stats import gaussian_kde as gauskde
+#Below clears any figures
+graph.close()
+
 #Below imports necessary functions from elsewhere
 from starutils.populations import BGStarPopulation_TRILEGAL
 from starutils.populations import MultipleStarPopulation
@@ -235,7 +239,7 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 	graph.title('Eccentricity Distribution')
 	graph.xlabel('Eccentricity')
 	graph.ylabel('Counts')
-	graph.legend(loc='best', prop={'size':14})
+	graph.legend(loc='upper center', prop={'size':14})
 	graph.savefig(savename+'EccHist.png')
 	graph.close()
 	#
@@ -270,13 +274,41 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 			popformhere = poptype[c] + ' (' + str(radiusratio[c]) + '$R_E$): '
 		xhere = popdict[str(c)]['T14']/popdict[str(c)]['tau']
 		labelhere = (popformhere+'a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])+', p='+str(popdict[str(c)]['periodp']))
-		graph.hist(xhere[xhere < 10], histtype='step',  color=cols[c],label=labelhere)
+		graph.hist(xhere[xhere < 5], histtype='step',  color=cols[c],label=labelhere)
 	
 	graph.title('T14/Tau Distribution')
 	graph.xlabel('T14/Tau')
 	graph.ylabel('Counts')
-	graph.legend(loc='best', prop={'size':14})
+	graph.legend(loc='upper right', prop={'size':14})
 	graph.savefig(savename+'T14-tauRatioHist.png')
+	graph.close()
+	#
+	
+	
+	#Hist: (Approx Depth)
+	for c in range(0, numhere):
+		popformhere = None #Population form name
+		xhere = None #Declaring variable
+		if poptype[c] == 'Star':
+			popformhere = poptype[c] + ': '
+			xhere = popdict[str(c)]['depthapprox'] #Approx version for binaries
+		elif poptype[c] == 'Planet':
+			popformhere = poptype[c] + ' (' + str(radiusratio[c]) + '$R_E$): '
+			xhere = popdict[str(c)]['depthapprox'].copy() #More exact version for planetary systems
+			#Below throws an error if min depth as far out of proposed range
+			#if (-.00001) >= min(xhere):
+			#	raise ValueError("ALERT!  Errors in exact depth calculation for planets!!!  Check it out!!!")
+			#xhere[xhere < 0.0] = 0.0 #Gets rid of floating point errors
+			
+		labelhere = (popformhere+'a='+str(popdict[str(c)]['ecca'])+', b='+str(popdict[str(c)]['eccb'])+', p='+str(popdict[str(c)]['periodp']))
+		#graph.hist((xhere), histtype='step',  color=cols[c],label=labelhere)
+	
+	graph.title('Depth Distribution')
+	graph.xlabel('Depth')
+	graph.ylabel('Counts')
+	#graph.legend(loc='lower center', prop={'size':14})
+	#graph.xlim([0, 0.0002])
+	graph.savefig(savename+'DepthHist.png')
 	graph.close()
 	#
 	
@@ -284,28 +316,30 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 	
 	
 	#BELOW SECTION: Plots based in form upon background research papers (specifically, on the 'Exoplanet Transit Validations...' Paper	
-	#Scatter: T14 (in days) vs. log10(Exact Depth), Zoomed
+	#Scatter: T14 (in days) vs. log10(Depth), Zoomed
 	patches = []
 	for d in range(0, numhere):
 		popformhere = None #Population form name
 		if poptype[d] == 'Star':
 			popformhere = poptype[d] + ': '
+			yhere = np.log10(popdict[str(d)]['depthapprox'])
 		elif poptype[d] == 'Planet':
 			popformhere = poptype[d] + ' (' + str(radiusratio[d]) + '$R_E$): '
+			yhere = np.log10(popdict[str(d)]['depthexact'])
 		labelhere = (popformhere+'a='+str(popdict[str(d)]['ecca'])+', b='+str(popdict[str(d)]['eccb'])+', p='+str(popdict[str(d)]['periodp']))
 		
 		#Below takes care of labeling
 		patches.append(mpatch.Patch(color=cols[d], label=labelhere))
 		x = popdict[str(d)]['T14']/daysecs
-		y = np.log10(popdict[str(d)]['depthexact'])
 		lins = np.linspace(0,1,numhere)
-		graph.scatter(x, y, facecolors='black', edgecolors=cols[d], s=2,alpha=(1-((d+1)/(len(lins)*1.0+1)))*.2)
+		graph.scatter(x, yhere, facecolors='black', edgecolors=cols[d], s=2,alpha=(1-((d+1)/(len(lins)*1.0+1)))*.2)
 		
-	graph.title('T14 (in Days) vs. Log10(Depth, Exact)')
+	graph.title('T14 (in Days) vs. Log10(Depth)')
 	graph.xlabel('T14 in Days')
-	graph.ylabel('Log10(Depth, Exact)')
-	graph.xlim([-1, 5])
-	graph.legend(loc='best', handles=patches, prop={'size':10})
+	graph.ylabel('Log10(Depth)')
+	graph.xlim([0, 3]) #([-.5, 5])
+	graph.ylim([-5, .5]) #([-8, .5])
+	graph.legend(loc='lower right', handles=patches, prop={'size':12})
 	graph.savefig(savename+'T14vsLog10DepthExactZoom.png')
 	graph.close()
 	#
@@ -332,9 +366,9 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 	graph.title('T14 (in Days) vs. T14/tau Ratio')
 	graph.xlabel('T14 in Days')
 	graph.ylabel('T14/tau Ratio')
-	graph.xlim([-.5, 5])
-	graph.ylim([-1, 150])
-	graph.legend(loc='upper left', handles=patches, prop={'size':10})
+	graph.xlim([0, 3]) #([-1, 5])
+	graph.ylim([1.5, 10]) #([-1, 150])
+	graph.legend(loc='best', handles=patches, prop={'size':12})
 	graph.savefig(savename+'T14vsT14-tauRatio.png')
 	graph.close()
 	
@@ -346,23 +380,24 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 		popformhere = None #Population form name
 		if poptype[f] == 'Star':
 			popformhere = poptype[f] + ': '
+			xhere = np.log10(popdict[str(f)]['depthapprox'])
 		elif poptype[f] == 'Planet':
 			popformhere = poptype[f] + ' (' + str(radiusratio[f]) + '$R_E$): '
+			xhere = np.log10(popdict[str(f)]['depthexact'])
 		labelhere = (popformhere+'a='+str(popdict[str(f)]['ecca'])+', b='+str(popdict[str(f)]['eccb'])+', p='+str(popdict[str(f)]['periodp']))
 		
 		#Below takes care of labeling
 		patches.append(mpatch.Patch(color=cols[f], label=labelhere))
-		x = np.log10(popdict[str(f)]['depthexact'])
 		y = (popdict[str(f)]['T14'])/(popdict[str(f)]['tau'])
 		lins = np.linspace(0,1,numhere)
-		graph.scatter(x, y, facecolors='black', edgecolors=cols[f], s=2,alpha=(1-((e+1)/(len(lins)*1.0+1)))*.2)
+		graph.scatter(xhere, y, facecolors='black', edgecolors=cols[f], s=2,alpha=(1-((e+1)/(len(lins)*1.0+1)))*.2)
 		
 	graph.title('Log10(Depth, Exact) vs. T14/tau Ratio')
 	graph.xlabel('Log10(Depth, Exact)')
 	graph.ylabel('T14/tau Ratio')
-	graph.xlim([-8, 1])
-	graph.ylim([-10, 100])
-	graph.legend(loc='best', handles=patches, prop={'size':10})
+	graph.xlim([-5.5, .5]) #([-8, .5])
+	graph.ylim([0, 20]) #([-1, 100])
+	graph.legend(loc='best', handles=patches, prop={'size':12})
 	graph.savefig(savename+'Log10DepthExactvsT14-tauRatioZoom.png')
 	graph.close()
 	
@@ -370,6 +405,152 @@ def varypop(population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], e
 	#Returns finished dictionary of populations
 	return popdict
 ##
+
+
+
+##FUNCTION: varypopkde
+#Purpose: This function is a variation of the function 'varypop', but specifically plots kde plots of different populations and, if given, will estimate the probabilities for a given array of points to be in each of the kde density groups.
+#Requires that the parameters periodp, ecca, and eccb be passed in as arrays of the same size.  Will treat the parameter arrays as a giant matrix and will overplot each set of entries for each singular plot.
+#For example, the first entries of each parameter array would be used to generate the first population; would plot for that population.
+def varypopkde(points=None, population=pop, poptype=['Star', 'Star', 'Star'], periodp=[3,3,3], ecca=[2,2,2], eccb=[2,2,2], numruns=int(1e4), radiusratio=[1,1,1], radiusbinsize=0.3, savenameroot='exrunkde', band='Kepler', **kwargs):
+	#BELOW SECTION: Imports necessary plotting function
+	#import seaborn as sns
+	import matplotlib as pltlib
+	
+	#BELOW SECTION: Some error control
+	#Below throws an error if passed-in values are not in list or np.array form
+	for part in [periodp, ecca, eccb]:
+		if not isinstance(part, list) and not isinstance(part, np.ndarray):
+			raise ValueError("Wait!  Please pass in all parameters periodp, ecca, and eccb in either list or numpy array form.  The parameter poptype should of course be a list.")
+	#Below throws an error if mismatching parameter array lengths were passed in
+	if len(periodp) != len(ecca) or len(ecca) != len(eccb) or len(eccb) != len(periodp) or len(poptype) != len(periodp):
+		raise ValueError("Whoa!  It seems you passed in parameter arrays with mismatching lengths.  Please make sure your parameter arrays all have the same length.")
+	numhere = len(periodp) #Number of parameter sets
+	maps = ['Oranges', 'Greens', 'Greys', 'Blues', 'Purples', 'Greens', 'Greys', 'Oranges', 'Purples', 'Reds', 'copper', 'binary']
+	cols = ['orange', 'green', 'grey', 'blue', 'purple', 'green', 'grey', 'orange', 'purple', 'red', 'brown', 'black']
+	graph.close() #Just in case
+	
+	
+	#BELOW SECTION: Generates dictionary of populations
+	savename = savenameroot #For recording graphs #For saving graphs
+	popdict = {}
+	for a in range(0, numhere):
+		#BELOW SECTION: Generates results for populations for the current parameters
+		pophere = None #Declares variable
+		if poptype[a] == 'Star':
+			pophere = genstarpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'star'), band=band, plot=False)
+		elif poptype[a] == 'Planet':
+			pophere = genplanetpop(population=pop, periodp=periodp[a], ecca=ecca[a], eccb=eccb[a], numruns=numruns, savename=(str(savenameroot)+'planet'), radiusratio=float(radiusratio[a]), band=band, plot=False)
+		else:
+			raise ValueError("Looks like you passed an invalid value for poptype.")
+		
+		#Below adds these populations to the dictionary
+		popdict[str(a)] = pophere
+	
+	patches = []
+	kdeclfs = [] #To hold generated kde classifiers
+	kdepreds = [] #To hold classifier predictions
+	fig, ax = graph.subplots() ##############
+	#BELOW SECTION: Generates kde plots
+	#KDE Plot: T14 vs. T14-Tau Ratio
+	for b in range(0, numhere):
+		#Below records the current arrays to use
+		xhere = (popdict[str(b)]['T14']).copy()/daysecs
+		yhere = (popdict[str(b)]['T14']).copy()/(popdict[str(b)]['tau']).copy()
+		
+		#Below adds a little bit of 'jitter' to data, for plotting purposes
+		xjitter = np.random.random(size=len(xhere)) * .000001
+		yjitter = np.random.random(size=len(yhere)) * .000001
+		#Below adds in jitter
+		xhere = xhere + xjitter
+		yhere = yhere + yjitter
+		
+		#Below generates a kde function for current population
+		kdeclfhere = gauskde(np.vstack([xhere, yhere]), bw_method='scott')
+		
+		#######################
+		
+		xmin = xhere.min()
+		ymin = yhere.min()
+		xmax = xhere.max()
+		ymax = yhere.max()
+		
+		X, Y = np.mgrid[xmin:xmax:200j, xmin:xmax:200j]
+		positions = np.vstack([X.ravel(), Y.ravel()])
+		values = np.vstack([xhere, yhere])
+		kernel = gauskde(values)
+		Z = np.reshape(kernel(positions).T, X.shape)
+		
+		#graph.close()
+		#fig = graph.figure()
+		#ax = fig.add_subplot(111)
+		#ax.imshow(np.rot90(Z), cmap=maps[b], alpha=.3, extent=[xmin, xmax, ymin, ymax], aspect='auto') #, alpha=.3)
+		ax.contour(X, Y, Z, colors=cols[b])
+		#ax.plot(xhere, yhere, 'k.', color=cols[b], markersize=4, alpha=.1)
+		
+		#######################
+		
+		
+		
+		kdeclfs.append(kdeclfhere)
+		#Below predicts on given points if passed in
+		if points is not None:
+			predshere = kdeclfhere(points) #Predictions here
+			kdepreds.append(predshere) #Adds to list of predictions
+		
+		#Below takes care of labeling and such
+		popformhere = None
+		if poptype[b] == 'Star':
+			popformhere = poptype[b] + ': '
+		elif poptype[b] == 'Planet':
+			popformhere = poptype[b] + ' (' + str(radiusratio[b]) + '$R_E$): '
+		labelhere = (popformhere+'a='+str(popdict[str(b)]['ecca'])+', b='+str(popdict[str(b)]['eccb'])+', p='+str(popdict[str(b)]['periodp']))
+		patches.append(mpatch.Patch(color=cols[b], label=labelhere))
+		
+		#Below carries out the kernel density graphing stuff
+		lins = np.linspace(0,1,numhere)
+		alphas = [.9, .4, .4]
+
+	#Below takes care of labeling of plot
+	graph.title('KDE Density Distributions of T14 vs. T14/tau Ratio', fontsize=14)
+	graph.xlabel('T14 (in Days)', fontsize=14)
+	graph.ylabel('T14/tau Ratio', fontsize=14)
+	#graph.xlim([0, 1.8])
+	#graph.ylim([0, 7.5])
+	pltlib.rc('xtick', labelsize=14)
+	pltlib.rc('ytick', labelsize=14)
+	graph.legend(loc='lower right', handles=patches, prop={'size':12})
+	graph.savefig(savenameroot + '-T14vsT14-tauRatio.png')
+	graph.show()
+		
+
+	##############		
+	"""
+	import processfile as tempwoo
+
+	tempdict = tempwoo.tempreturn()
+	n = np.arange(20) + 1
+	ax.scatter(tempdict['x1'], tempdict['y1'], color='red', label='Group1')
+	ax.scatter(tempdict['x2'], tempdict['y2'], color='blue', label='Group2')
+	for i, txt in enumerate(n):
+		ax.annotate(txt, (tempdict['xfull'][i],tempdict['yfull'][i]), fontsize=14)
+	graph.xlim([0, 5])
+	graph.ylim([0, 20])
+	graph.savefig('tempkdeplotnew.png')
+	#fig.render(graph.gcf()) ##########
+	graph.show()
+	"""
+	##############	
+				
+		
+	#Below adds predictions to dictionary
+	popdict['kdepreds'] = kdepreds
+	#Below returns finished dictionary of populations
+	return popdict
+##		
+
+
+
 
 
 
@@ -428,13 +609,13 @@ def runmodel(rAraw, rBraw, massAraw, massBraw, uAraw, uBraw, magraw, periodp=3, 
 		
 		
 		#Below generates period and semi here
-		periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False) #Period between about 4 and 20 years
+		periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False, withprob=True) #Period between about 4 and 20 years
 		semihere = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
 		
 		#Below ensures period as within the roche limit
 		while withinroche(semihere, mass1=massAraw[totalplace], mass2=massBraw[totalplace], r1=rhere, r2=rnothere):
 			#Below generates new periods and semis until valid distance
-			periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False) #Period between about 4 and 20 years
+			periodhere = makeperiod(1, periodp, rangestart=yeardays*4, rangeend=yeardays*20, dayunits=False, withprob=True) #Period between about 4 and 20 years
 			semihere = calcsemimajor(period=periodhere, massstar=massAraw[totalplace]+massBraw[totalplace])
 			
 			#Below increments count of tries
@@ -604,7 +785,7 @@ def calctransit(mass1=None, massp=None, r1=None, r2=None, period=None, ecc=None,
 	depthexact = "You didn't specify u1 and u2.  Therefore depthexact was not created."
 	if u1 is not None and u2 is not None:
 		constex = (1 - np.sqrt(1 - imp**2.0)) #At max light lost
-		numeratorex = 1.0 - (u1*constex) - (u2*constex)**2.0
+		numeratorex = 1.0 - (u1*constex) - u2*(constex)**2.0
 		denominatorex = 1.0 - (u1/3.0) - (u2/6.0)
 		depthexact = ((rp/rs)**2.0)*numeratorex/denominatorex
 	
@@ -855,10 +1036,21 @@ def makeangle(n):
 ##FUNCTION: makeperiod
 #Purpose: Below as method to return a given number (n) of periods, sampled from a Power Law Distribution, to the power of p; rangestart and rangeend should be passed through in days
 #Notes: If dayunits passed as False, will work in units of seconds
-def makeperiod(n, p, rangestart=None, rangeend=None, dayunits=True):
+def makeperiod(n, p, withprob=None, rangestart=None, rangeend=None, dayunits=True):
+	#Below throws an error, reminding user to pass in a value for withprob if not provided
+	if withprob != False and withprob != True:
+		raise ValueError("Wait!  Please pass in a value for the parameter 'withprob,' which either adds in or does not add in the effect of transit probability, as either True or False.")
+	
 	#Below imports basic packages
 	import random as rand
 	n = int(n)
+	
+	#Below adds in effect of transit probability if withprob passed in as True
+	phere = None #The power law index to use
+	if withprob is False:
+		phere = p
+	elif withprob is True:
+		phere = p - (2.0/3.0)
 	
 	#BELOW SECTION: Samples random numbers in a certain range
 	#If no range given, then samples between zero and endrange generated below
@@ -874,21 +1066,21 @@ def makeperiod(n, p, rangestart=None, rangeend=None, dayunits=True):
 	
 		#Below generates the power law results
 		if dayunits is True: #In units of days
-			perdone = (randnum**p)
+			perdone = (randnum**phere)
 			return perdone
 		
 		elif dayunits is False: #In units of seconds
-			perdone = (randnum**p)*daysecs
+			perdone = (randnum**phere)*daysecs
 			return perdone
 		
 	#If range is given, then samples from between endrange
 	elif rangestart is not None and rangeend is not None:
 		randinrange = np.zeros(n) #To hold random numbers
 		for b in range(0, n):
-			randinrange[b] = rand.uniform((rangestart*daysecs)**(1.0/p), (rangeend*daysecs)**(1.0/p))
+			randinrange[b] = rand.uniform((rangestart*daysecs)**(1.0/phere), (rangeend*daysecs)**(1.0/phere))
 			
 		#Below generates the power law results
-		perdone = (randinrange**p)
+		perdone = (randinrange**phere)
 		return perdone
 ##
 
